@@ -1,64 +1,89 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+// ⬇️ Use your authenticated axios instance (adjust the relative path as needed)
+import api from '../api/api'; // or '../api/api' depending on file location
 
-// Type definitions for form data
 interface TransactionFormData {
-    date: string; // YYYY-MM-DD
-    income: number | ''; // Use '' for initial empty state to avoid 0
-    expense: number | ''; // Use '' for initial empty state
-    description: string;
-    personInvolved: string; // "Person who receives the money or make a payment"
+  date: string;
+  income: number | '';
+  expense: number | '';
+  description: string;
+  personInvolved: string;
 }
 
 const AddTransactionForm: React.FC = () => {
-    const navigate = useNavigate();
-    const [formData, setFormData] = useState<TransactionFormData>({
-        date: '',
-        income: '',
-        expense: '',
-        description: '',
-        personInvolved: ''
-    });
-    const [errors, setErrors] = useState<Record<string, string>>({}); // For form validation errors
-    const [submitStatus, setSubmitStatus] = useState<string | null>(null); // For success/error messages after submit
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState<TransactionFormData>({
+    date: '',
+    income: '',
+    expense: '',
+    description: '',
+    personInvolved: ''
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitStatus, setSubmitStatus] = useState<string | null>(null);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ 
-            ...prev, 
-            [name]: (name === 'income' || name === 'expense') ? (value === '' ? '' : Number(value)) : value 
-        }));
-        setErrors(prev => ({ ...prev, [name]: '' })); // Clear error on change
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]:
+        name === 'income' || name === 'expense'
+          ? (value === '' ? '' : Number(value))
+          : value
+    }));
+    setErrors(prev => ({ ...prev, [name]: '' }));
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.date) newErrors.date = 'Date is required.';
+    if (formData.income === '' && formData.expense === '') {
+      newErrors.income = 'Either Income or Expense is required.';
+      newErrors.expense = 'Either Income or Expense is required.';
+    }
+    if (formData.income !== '' && (isNaN(Number(formData.income)) || Number(formData.income) < 0)) {
+      newErrors.income = 'Income must be a non-negative number.';
+    }
+    if (formData.expense !== '' && (isNaN(Number(formData.expense)) || Number(formData.expense) < 0)) {
+      newErrors.expense = 'Expense must be a non-negative number.';
+    }
+    if (!formData.description) newErrors.description = 'Description is required.';
+    if (!formData.personInvolved) newErrors.personInvolved = 'Person involved is required.';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitStatus(null);
+
+    if (!validateForm()) {
+      setSubmitStatus('❌ Please fix the errors in the form.');
+      return;
+    }
+
+    // Coerce empty fields to numbers so the backend doesn’t choke on "".
+    const payload = {
+      date: formData.date,
+      income: formData.income === '' ? 0 : Number(formData.income),
+      expense: formData.expense === '' ? 0 : Number(formData.expense),
+      description: formData.description.trim(),
+      personInvolved: formData.personInvolved.trim(),
     };
 
-    const validateForm = () => {
-        const newErrors: Record<string, string> = {};
-        if (!formData.date) newErrors.date = "Date is required.";
-        if (formData.income === '' && formData.expense === '') {
-            newErrors.income = "Either Income or Expense is required.";
-            newErrors.expense = "Either Income or Expense is required.";
-        }
-        if (formData.income && (isNaN(Number(formData.income)) || Number(formData.income) < 0)) newErrors.income = "Income must be a non-negative number.";
-        if (formData.expense && (isNaN(Number(formData.expense)) || Number(formData.expense) < 0)) newErrors.expense = "Expense must be a non-negative number.";
-        if (!formData.description) newErrors.description = "Description is required.";
-        if (!formData.personInvolved) newErrors.personInvolved = "Person involved is required.";
+    try {
+      const res = await api.post('/transactions', payload); // <-- uses token via interceptor
+      console.log('Transaction saved:', res.data);
+      setSubmitStatus('✅ Transaction submitted successfully!');
+      setTimeout(() => navigate('/finance'), 800);
+    } catch (err) {
+      console.error('Error submitting transaction:', err);
+      setSubmitStatus('❌ Failed to submit transaction.');
+    }
+  };
 
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setSubmitStatus(null);
-        if (!validateForm()) {
-            setSubmitStatus("Please fix the errors in the form.");
-            return;
-        }
-
-        console.log("Form Data Submitted:", formData);
-        setSubmitStatus("Transaction submitted successfully! (No API call yet)"); // Placeholder for API success
-        // navigate('/finance'); // Redirect after successful submission (uncomment when API is integrated)
-    };
 
     return (
         <div className="max-w-2xl mx-auto p-6 bg-white rounded-xl shadow-md my-8">

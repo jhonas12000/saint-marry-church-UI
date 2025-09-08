@@ -1,328 +1,899 @@
-// import React, { useState } from "react";
+
+// import { useEffect, useMemo, useState } from "react";
 // import { useNavigate } from "react-router-dom";
+// import api from "../../api/api";
+// import { useAuth } from "../../auth/AuthProvider";
 
-
-// type Member = {
+// interface Member {
 //   id: number;
 //   fullName: string;
-//   phone: string;
-  
+//   telephone: string;
+//   email: string;
+//   monthlyPayment?: number;
+//   medhaneAlemPledge?: number;
+// }
+
+// type Payment = {
+//   id: number;
+//   amount: number;
+//   monthPaid: string;
+//   paymentDate: string; // yyyy-mm-dd
 // };
 
-// const mockMembers: Member[] = [
-//   { id: 1, fullName: "Yonas Weldemichael", phone: "(510) 123-4567" },
-//   { id: 2, fullName: "Ruth Abraham", phone: "(408) 765-4321" },
-//   // ... you'll replace this with fetched members later
+// const MONTHS = [
+//   "January","February","March","April","May","June",
+//   "July","August","September","October","November","December"
 // ];
 
-// // Extend this list to cover all 12 months
-// const allMonths = [
-//   "January", "February", "March", "April", "May", "June",
-//   "July", "August", "September", "October", "November", "December"
-// ];
+// export default function FinanceOfficerView(): JSX.Element {
+//   const navigate = useNavigate();
+//   const { user } = useAuth();
 
-// const FinanceOfficerView: React.FC = () => {
-//     const navigate = useNavigate(); 
+//   const [members, setMembers] = useState<Member[]>([]);
+//   const [loading, setLoading] = useState(true);
+//   const [status, setStatus] = useState("");
 
-//   const [payments, setPayments] = useState<Record<number, string[]>>({}); 
-//   const [saveStatus, setSaveStatus] = useState<string | null>(null); // To show save messages
+//   // per-member UI state
+//   const [paymentsByMember, setPaymentsByMember] = useState<Record<number, Payment[]>>({});
+//   const [amountByMember, setAmountByMember] = useState<Record<number, string>>({});
+//   const [fromByMember, setFromByMember] = useState<Record<number, string>>({});
+//   const [toByMember, setToByMember] = useState<Record<number, string>>({});
+//   const [includePledgeByMember, setIncludePledgeByMember] = useState<Record<number, boolean>>({});
+//   const [searchQuery, setSearchQuery] = useState("");
+//   const [expandedMember, setExpandedMember] = useState<number | null>(null);
 
-  
-
-//   const toggleMonth = (memberId: number, month: string) => {
-//     setPayments((prev) => {
-//       const currentMemberPayments = prev[memberId] || []; // Get current payments for this member
-//       const updatedMemberPayments = currentMemberPayments.includes(month)
-//         ? currentMemberPayments.filter((m) => m !== month) // Remove month if already selected
-//         : [...currentMemberPayments, month]; // Add month if not selected
-      
-//       // Return new state, ensuring array is sorted for consistency (optional)
-//       return { ...prev, [memberId]: updatedMemberPayments.sort((a, b) => allMonths.indexOf(a) - allMonths.indexOf(b)) };
-//     });
+//   // ------- Data fetching -------
+//   const loadMembers = async () => {
+//     setLoading(true);
+//     setStatus("");
+//     try {
+//       // baseURL in api = http://localhost:8080/api
+//       const { data } = await api.get<Member[]>("/church-members");
+//       setMembers(Array.isArray(data) ? data : []);
+//     } catch (e: any) {
+//       const sc = e?.response?.status;
+//       if (sc === 401 || sc === 403) {
+//         setStatus("You are not authorized to view members.");
+//         // Optionally: navigate("/signin");
+//       } else {
+//         setStatus("Failed to load members.");
+//       }
+//       console.error("Failed to load members", e);
+//     } finally {
+//       setLoading(false);
+//     }
 //   };
 
-//   const handleSavePayments = async () => {
-//     setSaveStatus("Saving...");
-    
-//     const token = null; // getJwtToken(); // Get the current user's JWT token
+//   const fetchPayments = async (id: number) => {
+//     try {
+//       const { data } = await api.get<Payment[]>(`/payments/member/${id}`);
+//       setPaymentsByMember(prev => ({ ...prev, [id]: data || [] }));
+//     } catch (e) {
+//       console.error("Failed to load payments", e);
+//       setStatus("Failed to load payment history.");
+//     }
+//   };
 
-//     if (!token) {
-//       setSaveStatus("Error: Not authenticated. Please log in.");
-//       // navigate('/signin'); // Redirect to login
+//   useEffect(() => {
+//     if (user) loadMembers();
+//   }, [user]);
+
+//   // ------- Derived helpers -------
+//   const monthIndex = (m?: string) => (m ? MONTHS.indexOf(m) : -1);
+
+//   // Auto-calc amount when from/to & monthly exist
+//   // Auto-calc amount when from/to & monthly exist (guarded)
+// useEffect(() => {
+//   setAmountByMember(prev => {
+//     let changed = false;
+//     const merged = { ...prev };
+
+//     for (const m of members) {
+//       const from = fromByMember[m.id];
+//       const to = toByMember[m.id];
+//       const monthly = m.monthlyPayment || 0;
+//       if (!from || !to || monthly <= 0) continue;
+
+//       const fi = MONTHS.indexOf(from);
+//       const ti = MONTHS.indexOf(to);
+//       if (fi === -1 || ti === -1 || ti < fi) continue;
+
+//       const count = ti - fi + 1;
+//       const computed = (monthly * count).toFixed(2);
+
+//       if (merged[m.id] !== computed) {
+//         merged[m.id] = computed;
+//         changed = true;
+//       }
+//     }
+
+//     return changed ? merged : prev;
+//   });
+// }, [fromByMember, toByMember, members]);
+
+
+//   // Auto-calc "to" when from & amount & monthly exist
+// // Auto-calc "to" when from & amount & monthly exist (guarded)
+// useEffect(() => {
+//   setToByMember(prev => {
+//     let changed = false;
+//     const merged = { ...prev };
+
+//     for (const m of members) {
+//       const from = fromByMember[m.id];
+//       const amountStr = amountByMember[m.id];
+//       const monthly = m.monthlyPayment || 0;
+//       if (!from || !amountStr || monthly <= 0) continue;
+
+//       const fi = MONTHS.indexOf(from);
+//       const amount = parseFloat(amountStr);
+//       if (fi < 0 || !isFinite(amount) || amount <= 0) continue;
+
+//       const monthsCovered = Math.floor(amount / monthly);
+//       const ti = fi + monthsCovered - 1;
+//       if (ti >= fi && ti < MONTHS.length) {
+//         const computedTo = MONTHS[ti];
+//         if (merged[m.id] !== computedTo) {
+//           merged[m.id] = computedTo;
+//           changed = true;
+//         }
+//       }
+//     }
+
+//     return changed ? merged : prev;
+//   });
+// }, [amountByMember, fromByMember, members]);
+
+
+//   // ------- UI interactions -------
+//   const togglePayments = (id: number) => {
+//     setIncludePledgeByMember(prev => ({ ...prev, [id]: false }));
+//     if (expandedMember === id) {
+//       setExpandedMember(null);
+//     } else {
+//       setExpandedMember(id);
+//       fetchPayments(id);
+//     }
+//   };
+
+//   const handleSubmitPayment = async (member: Member) => {
+//     setStatus("");
+//     const todayStr = new Date().toISOString().split("T")[0];
+
+//     // Pledge flow
+//     if (includePledgeByMember[member.id]) {
+//       if (!member.medhaneAlemPledge || member.medhaneAlemPledge <= 0) {
+//         setStatus("Invalid pledge amount.");
+//         return;
+//       }
+//       try {
+//         await api.post("/payments", {
+//           amount: member.medhaneAlemPledge,
+//           monthPaid: "Medhane Alem",
+//           paymentDate: todayStr,
+//           churchMember: { id: member.id },
+//         });
+//         setStatus("Pledge recorded.");
+//         await fetchPayments(member.id);
+//         setExpandedMember(member.id);
+//       } catch (e) {
+//         console.error(e);
+//         setStatus("Failed to record pledge.");
+//       }
 //       return;
 //     }
 
-//     // Prepare data to send (example structure)
-//     const dataToSend = Object.entries(payments).map(([memberId, monthsPaid]) => ({
-//       memberId: Number(memberId),
-//       monthsPaid: monthsPaid,
-//       year: new Date().getFullYear(), // Assume current year for payments
-//     }));
+//     // Monthly flow
+//     const from = fromByMember[member.id];
+//     const amount = parseFloat(amountByMember[member.id] || "");
+//     const monthly = member.monthlyPayment || 0;
+//     if (!from || !isFinite(amount) || amount <= 0 || monthly <= 0) {
+//       setStatus("Invalid month or amount.");
+//       return;
+//     }
 
-//     console.log("Data to save:", dataToSend); // For debugging
-    
+//     const fi = monthIndex(from);
+//     if (fi < 0) {
+//       setStatus("Invalid start month.");
+//       return;
+//     }
+
+//     const count = Math.floor(amount / monthly);
+//     if (count <= 0) {
+//       setStatus("Amount is less than one month.");
+//       return;
+//     }
+
 //     try {
-//       // ✅ TODO: Replace with your actual backend API endpoint for saving payments
-//       const response = await fetch("http://localhost:8080/finance/record-payments", { 
-//         method: "POST",
-//         headers: {
-//           "Content-Type": "application/json",
-//           "Authorization": `Bearer ${token}` 
-//         },
-//         body: JSON.stringify(dataToSend),
-//       });
-
-//       if (response.ok) {
-//         setSaveStatus("Payments saved successfully!");
-//         // Optionally clear payments state or refresh data after successful save
-//         // setPayments({}); 
-//       } else {
-//         const errorText = await response.text(); // Get detailed error
-//         setSaveStatus(`Error saving payments: ${response.status} - ${errorText}`);
-//         console.error("Failed to save payments:", errorText);
+//       // record each month as a separate payment
+//       for (let i = 0; i < count; i++) {
+//         const idx = fi + i;
+//         const monthName = MONTHS[idx % 12];
+//         await api.post("/payments", {
+//           amount: monthly,
+//           monthPaid: monthName,
+//           paymentDate: todayStr,
+//           churchMember: { id: member.id },
+//         });
 //       }
-//     } catch (err: any) {
-//       setSaveStatus(`Network error: ${err.message}`);
-//       console.error("Network error during save:", err);
+//       setStatus(`Recorded ${count} payment${count > 1 ? "s" : ""}.`);
+//       await fetchPayments(member.id);
+//       setExpandedMember(member.id);
+//     } catch (e) {
+//       console.error(e);
+//       setStatus("Failed to record payments.");
 //     }
 //   };
 
-//   return (
-//     <div className="p-6"> {/* Added a main wrapper for consistency */}
-//       <h1 className="text-2xl font-bold mb-6 text-gray-800">Finance Officer - Record Payments</h1>
+//   const handleDeletePayment = async (memberId: number, paymentId: number) => {
+//     setStatus("");
+//     try {
+//       //await api.delete(`/payments/${paymentId}`);
+//       await api.delete(`/payments/${paymentId}/${memberId}`);
+//       setStatus("Payment deleted.");
+//       await fetchPayments(memberId);
+//     } catch (e) {
+//       console.error(e);
+//       setStatus("Failed to delete payment.");
+//     }
+//   };
 
-//       {saveStatus && (
-//         <div className={`mb-4 p-3 rounded ${saveStatus.startsWith("Error") ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
-//           {saveStatus}
+//   const filtered = useMemo(
+//     () =>
+//       members.filter((m) => {
+//         const q = searchQuery.trim().toLowerCase();
+//         if (!q) return true;
+//         return (
+//           m.fullName.toLowerCase().includes(q) ||
+//           (m.telephone || "").includes(q)
+//         );
+//       }),
+//     [members, searchQuery]
+//   );
+
+//   return (
+//     <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
+//       <div className="flex flex-col md:flex-row justify-between items-center">
+//         <h2 className="text-2xl font-bold mb-2 md:mb-0">Finance Officer View</h2>
+//         <input
+//           type="text"
+//           placeholder="Search by name or phone"
+//           value={searchQuery}
+//           onChange={(e) => setSearchQuery(e.target.value)}
+//           className="border px-4 py-2 rounded w-full md:w-64"
+//         />
+//       </div>
+
+//       {status && (
+//         <div
+//           className={`p-3 rounded text-sm font-medium ${
+//             status.startsWith("Recorded") || status.includes("deleted")
+//               ? "bg-green-100 text-green-800"
+//               : "bg-red-100 text-red-800"
+//           }`}
+//         >
+//           {status}
 //         </div>
 //       )}
 
-//       {/* Render members (using mockMembers for now) */}
-//       {mockMembers.length === 0 ? (
-//         <p className="text-gray-600">No members to display.</p>
-//       ) : (
-//         <div className="space-y-6">
-//           {mockMembers.map((m) => (
-//             <div key={m.id} className="border p-4 rounded bg-white shadow">
-//               <p><strong>Name:</strong> {m.fullName}</p>
-//               <p><strong>Phone:</strong> {m.phone}</p>
+//       {loading && <p>Loading members…</p>}
 
-//               <label className="block mt-2 font-medium text-gray-700">Select Months Paid (Current Year):</label>
-//               <div className="flex flex-wrap gap-4 mt-2">
-//                 {allMonths.map((month) => (
-//                   <label key={month} className="flex items-center gap-2 cursor-pointer bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-full text-blue-800">
+//       {!loading &&
+//         filtered.map((member) => (
+//           <div
+//             key={member.id}
+//             className="border rounded-lg shadow p-4 space-y-3 bg-white"
+//           >
+//             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+//               <div className="space-y-1 text-sm">
+//                 <p className="font-semibold text-lg">{member.fullName}</p>
+//                 <p>📞 {member.telephone}</p>
+//                 <p>📧 {member.email}</p>
+//                 <p>💵 Monthly: ${member.monthlyPayment ?? 0}</p>
+//               </div>
+
+//               <div className="flex flex-col space-y-2 mt-4 sm:mt-0">
+//                 <label className="flex items-center gap-2">
+//                   <input
+//                     type="checkbox"
+//                     checked={includePledgeByMember[member.id] || false}
+//                     onChange={(e) =>
+//                       setIncludePledgeByMember((prev) => ({
+//                         ...prev,
+//                         [member.id]: e.target.checked,
+//                       }))
+//                     }
+//                   />
+//                   Record Medhane Alem
+//                 </label>
+
+//                 {!includePledgeByMember[member.id] && (
+//                   <>
+//                     <div className="flex gap-2">
+//                       <select
+//                         value={fromByMember[member.id] || ""}
+//                         onChange={(e) =>
+//                           setFromByMember((prev) => ({
+//                             ...prev,
+//                             [member.id]: e.target.value,
+//                           }))
+//                         }
+//                         className="border rounded px-2 py-1"
+//                       >
+//                         <option value="">From</option>
+//                         {MONTHS.map((m) => (
+//                           <option key={m} value={m}>
+//                             {m}
+//                           </option>
+//                         ))}
+//                       </select>
+
+//                       <select
+//                         value={toByMember[member.id] || ""}
+//                         onChange={(e) =>
+//                           setToByMember((prev) => ({
+//                             ...prev,
+//                             [member.id]: e.target.value,
+//                           }))
+//                         }
+//                         className="border rounded px-2 py-1"
+//                       >
+//                         <option value="">To</option>
+//                         {fromByMember[member.id] &&
+//                           MONTHS.slice(monthIndex(fromByMember[member.id]))
+//                             .map((m) => (
+//                               <option key={m} value={m}>
+//                                 {m}
+//                               </option>
+//                             ))}
+//                       </select>
+//                     </div>
+
 //                     <input
-//                       type="checkbox"
-//                       className="form-checkbox h-4 w-4 text-blue-600"
-//                       checked={payments[m.id]?.includes(month) || false}
-//                       onChange={() => toggleMonth(m.id, month)}
+//                       type="number"
+//                       placeholder="Total"
+//                       value={amountByMember[member.id] || ""}
+//                       onChange={(e) =>
+//                         setAmountByMember((prev) => ({
+//                           ...prev,
+//                           [member.id]: e.target.value,
+//                         }))
+//                       }
+//                       className="border rounded px-2 py-1"
 //                     />
-//                     {month}
-//                   </label>
-//                 ))}
+//                   </>
+//                 )}
+
+//                 <button
+//                   onClick={() => handleSubmitPayment(member)}
+//                   className="bg-green-600 text-white py-1 px-3 rounded"
+//                 >
+//                   Record Payment
+//                 </button>
+//                 <button
+//                   onClick={() => togglePayments(member.id)}
+//                   className="bg-blue-600 text-white py-1 px-3 rounded"
+//                 >
+//                   {expandedMember === member.id
+//                     ? "Hide Payments"
+//                     : "View Payments"}
+//                 </button>
 //               </div>
 //             </div>
-//           ))}
-//         </div>
-//       )}
 
-//       <button
-//         onClick={handleSavePayments}
-//         className="mt-8 px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-lg"
-//       >
-//         Save Payment Records
-//       </button>
-//       <button
-//           onClick={() => navigate("/members/list")} 
-//           className="px-6 py-3 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors shadow-lg"
-//         >
-//           Back to Members List
-//         </button>
+//             {expandedMember === member.id &&
+//               paymentsByMember[member.id] && (
+//                 <div className="mt-3 bg-gray-50 rounded p-3">
+//                   <h3 className="font-medium mb-2">Payment History</h3>
+//                   <table className="w-full text-sm border-collapse">
+//                     <thead>
+//                       <tr className="bg-gray-100">
+//                         <th className="border px-2 py-1 text-left">Date</th>
+//                         <th className="border px-2 py-1 text-right">Amount</th>
+//                         <th className="border px-2 py-1">Month</th>
+//                         <th className="border px-2 py-1">Year</th>
+//                         <th className="border px-2 py-1">Action</th>
+//                       </tr>
+//                     </thead>
+//                     <tbody>
+//                       {paymentsByMember[member.id].map((p) => {
+//                         const local = new Date(`${p.paymentDate}T00:00:00`);
+//                         return (
+//                           <tr key={p.id}>
+//                             <td className="border px-2 py-1">
+//                               {local.toLocaleDateString()}
+//                             </td>
+//                             <td className="border px-2 py-1 text-right">
+//                               ${Number(p.amount).toFixed(2)}
+//                             </td>
+//                             <td className="border px-2 py-1 text-center">
+//                               {p.monthPaid}
+//                             </td>
+//                             <td className="border px-2 py-1 text-center">
+//                               {local.getFullYear()}
+//                             </td>
+//                             <td className="border px-2 py-1 text-center">
+//                               <button
+//                                 onClick={() =>
+//                                   handleDeletePayment(member.id, p.id)
+//                                 }
+//                                 className="text-red-600 hover:underline text-xs"
+//                               >
+//                                 Delete
+//                               </button>
+//                             </td>
+//                           </tr>
+//                         );
+//                       })}
+//                     </tbody>
+//                   </table>
+//                 </div>
+//               )}
+//           </div>
+//         ))}
 //     </div>
 //   );
-// };
+// }
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../../api/api";
+import { useAuth } from "../../auth/AuthProvider";
 
-// export default FinanceOfficerView;
+interface ChurchMemberDTO {
+  id: number;
+  firstName: string;
+  lastName: string;
+  telephone: string;
+  email: string;
+  address?: string | null;
+  monthlyPayment?: number | null;
+  medhaneAlemPledge?: number | null;
+  memberSince?: string | null; // if your backend uses 'joinDate' or 'createdAt', we’ll handle it below
+  joinDate?: string | null;
+  createdAt?: string | null;
+}
 
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-//import { format } from 'date-fns';
-
-type Member = {
+interface Member {
   id: number;
   fullName: string;
-  phone: string;
+  telephone: string;
   email: string;
-};
+  monthlyPayment?: number | null;
+  medhaneAlemPledge?: number | null;
+  address?: string | null;
+  memberSince?: string | null; // ISO string
+}
 
 type Payment = {
+  id: number;
   amount: number;
   monthPaid: string;
-  paymentDate: string;
+  paymentDate: string; // yyyy-mm-dd
 };
 
-const months = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
+const MONTHS = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December"
 ];
 
-const FinanceOfficerView: React.FC = () => {
+export default function FinanceOfficerView(): JSX.Element {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
   const [members, setMembers] = useState<Member[]>([]);
-  const [month, setMonth] = useState<string>(new Date().toLocaleString('default', { month: 'long' }));
-  const [amount, setAmount] = useState();
+  const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
+
+  // per-member UI state
+  const [paymentsByMember, setPaymentsByMember] = useState<Record<number, Payment[]>>({});
+  const [amountByMember, setAmountByMember] = useState<Record<number, string>>({});
+  const [fromByMember, setFromByMember] = useState<Record<number, string>>({});
+  const [toByMember, setToByMember] = useState<Record<number, string>>({});
+  const [includePledgeByMember, setIncludePledgeByMember] = useState<Record<number, boolean>>({});
   const [searchQuery, setSearchQuery] = useState("");
-  const [paymentHistory, setPaymentHistory] = useState<Record<number, Payment[]>>({});
-  const [expandedMemberId, setExpandedMemberId] = useState<number | null>(null);
+  const [expandedMember, setExpandedMember] = useState<number | null>(null);
+
+  // ------- Data fetching -------
+  const loadMembers = async () => {
+    setLoading(true);
+    setStatus("");
+    try {
+      // baseURL in api = http://localhost:8080/api
+      const { data } = await api.get<ChurchMemberDTO[]>("/church-members");
+
+      // 🔽 map backend DTO -> Member used in this component
+      const mapped: Member[] = (Array.isArray(data) ? data : []).map((d) => ({
+        id: d.id,
+        fullName: [d.firstName, d.lastName].filter(Boolean).join(" ").trim(),
+        telephone: d.telephone,
+        email: d.email,
+        monthlyPayment: d.monthlyPayment ?? null,
+        medhaneAlemPledge: d.medhaneAlemPledge ?? null,
+        address: d.address ?? null,
+        memberSince: d.memberSince ?? d.joinDate ?? d.createdAt ?? null,
+      }));
+
+      setMembers(mapped);
+    } catch (e: any) {
+      const sc = e?.response?.status;
+      if (sc === 401 || sc === 403) {
+        setStatus("You are not authorized to view members.");
+        // Optionally: navigate("/signin");
+      } else {
+        setStatus("Failed to load members.");
+      }
+      console.error("Failed to load members", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchPayments = async (id: number) => {
+    try {
+      const { data } = await api.get<Payment[]>(`/payments/member/${id}`);
+      setPaymentsByMember(prev => ({ ...prev, [id]: data || [] }));
+    } catch (e) {
+      console.error("Failed to load payments", e);
+      setStatus("Failed to load payment history.");
+    }
+  };
 
   useEffect(() => {
-    const fetchMembers = async () => {
+    if (user) loadMembers();
+  }, [user]);
+
+  // ------- Derived helpers -------
+  const monthIndex = (m?: string) => (m ? MONTHS.indexOf(m) : -1);
+
+  // Auto-calc amount when from/to & monthly exist (guarded)
+  useEffect(() => {
+    setAmountByMember(prev => {
+      let changed = false;
+      const merged = { ...prev };
+
+      for (const m of members) {
+        const from = fromByMember[m.id];
+        const to = toByMember[m.id];
+        const monthly = m.monthlyPayment || 0;
+        if (!from || !to || monthly <= 0) continue;
+
+        const fi = MONTHS.indexOf(from);
+        const ti = MONTHS.indexOf(to);
+        if (fi === -1 || ti === -1 || ti < fi) continue;
+
+        const count = ti - fi + 1;
+        const computed = (monthly * count).toFixed(2);
+
+        if (merged[m.id] !== computed) {
+          merged[m.id] = computed;
+          changed = true;
+        }
+      }
+
+      return changed ? merged : prev;
+    });
+  }, [fromByMember, toByMember, members]);
+
+  // Auto-calc "to" when from & amount & monthly exist (guarded)
+  useEffect(() => {
+    setToByMember(prev => {
+      let changed = false;
+      const merged = { ...prev };
+
+      for (const m of members) {
+        const from = fromByMember[m.id];
+        const amountStr = amountByMember[m.id];
+        const monthly = m.monthlyPayment || 0;
+        if (!from || !amountStr || monthly <= 0) continue;
+
+        const fi = MONTHS.indexOf(from);
+        const amount = parseFloat(amountStr);
+        if (fi < 0 || !isFinite(amount) || amount <= 0) continue;
+
+        const monthsCovered = Math.floor(amount / monthly);
+        const ti = fi + monthsCovered - 1;
+        if (ti >= fi && ti < MONTHS.length) {
+          const computedTo = MONTHS[ti];
+          if (merged[m.id] !== computedTo) {
+            merged[m.id] = computedTo;
+            changed = true;
+          }
+        }
+      }
+
+      return changed ? merged : prev;
+    });
+  }, [amountByMember, fromByMember, members]);
+
+  // ------- UI interactions -------
+  const togglePayments = (id: number) => {
+    setIncludePledgeByMember(prev => ({ ...prev, [id]: false }));
+    if (expandedMember === id) {
+      setExpandedMember(null);
+    } else {
+      setExpandedMember(id);
+      fetchPayments(id);
+    }
+  };
+
+  const handleSubmitPayment = async (member: Member) => {
+    setStatus("");
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    // Pledge flow
+    if (includePledgeByMember[member.id]) {
+      if (!member.medhaneAlemPledge || member.medhaneAlemPledge <= 0) {
+        setStatus("Invalid pledge amount.");
+        return;
+      }
       try {
-        const response = await axios.get('http://localhost:8080/api/church-members');
-        const formatted = response.data.map((m: any) => ({
-          id: m.id,
-          fullName: `${m.firstName} ${m.lastName}`,
-          phone: m.telephone,
-          email: m.email
-        }));
-        setMembers(formatted.sort((a, b) => a.fullName.localeCompare(b.fullName)));
-      } catch (error) {
-        console.error('Failed to fetch members', error);
-        setStatus("❌ Failed to load members");
+        await api.post("/payments", {
+          amount: member.medhaneAlemPledge,
+          monthPaid: "Medhane Alem",
+          paymentDate: todayStr,
+          churchMember: { id: member.id },
+        });
+        setStatus("Pledge recorded.");
+        await fetchPayments(member.id);
+        setExpandedMember(member.id);
+      } catch (e) {
+        console.error(e);
+        setStatus("Failed to record pledge.");
       }
-    };
-    fetchMembers();
-  }, []);
-
-  const handleSubmitPayment = async (memberId: number) => {
-    try {
-      await axios.post('http://localhost:8080/api/payments', {
-        amount,
-        monthPaid: month,
-        churchMember: { id: memberId }
-      });
-      setStatus(`✅ Payment recorded for member ${memberId}`);
-      if (paymentHistory[memberId]) {
-        await fetchPaymentHistory(memberId); // refresh history if open
-      }
-    } catch (err) {
-      console.error(err);
-      setStatus(`❌ Failed to save payment for member ${memberId}`);
-    }
-  };
-
-  const fetchPaymentHistory = async (memberId: number) => {
-    try {
-      const res = await axios.get(`http://localhost:8080/api/payments/member/${memberId}`);
-      setPaymentHistory(prev => ({ ...prev, [memberId]: res.data }));
-    } catch (err) {
-      console.error('Failed to fetch payment history', err);
-      setStatus(`❌ Failed to fetch history for member ${memberId}`);
-    }
-  };
-
-  const togglePaymentHistory = async (memberId: number) => {
-    if (expandedMemberId === memberId) {
-      setExpandedMemberId(null);
       return;
     }
-    if (!paymentHistory[memberId]) {
-      await fetchPaymentHistory(memberId);
+
+    // Monthly flow
+    const from = fromByMember[member.id];
+    const amount = parseFloat(amountByMember[member.id] || "");
+    const monthly = member.monthlyPayment || 0;
+    if (!from || !isFinite(amount) || amount <= 0 || monthly <= 0) {
+      setStatus("Invalid month or amount.");
+      return;
     }
-    setExpandedMemberId(memberId);
+
+    const fi = monthIndex(from);
+    if (fi < 0) {
+      setStatus("Invalid start month.");
+      return;
+    }
+
+    const count = Math.floor(amount / monthly);
+    if (count <= 0) {
+      setStatus("Amount is less than one month.");
+      return;
+    }
+
+    try {
+      for (let i = 0; i < count; i++) {
+        const idx = fi + i;
+        const monthName = MONTHS[idx % 12];
+        await api.post("/payments", {
+          amount: monthly,
+          monthPaid: monthName,
+          paymentDate: todayStr,
+          churchMember: { id: member.id },
+        });
+      }
+      setStatus(`Recorded ${count} payment${count > 1 ? "s" : ""}.`);
+      await fetchPayments(member.id);
+      setExpandedMember(member.id);
+    } catch (e) {
+      console.error(e);
+      setStatus("Failed to record payments.");
+    }
   };
 
-  const filteredMembers = members.filter((m) =>
-    m.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    m.phone.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    m.email.toLowerCase().includes(searchQuery.toLowerCase())
+  const handleDeletePayment = async (memberId: number, paymentId: number) => {
+    setStatus("");
+    try {
+      await api.delete(`/payments/${paymentId}/${memberId}`);
+      setStatus("Payment deleted.");
+      await fetchPayments(memberId);
+    } catch (e) {
+      console.error(e);
+      setStatus("Failed to delete payment.");
+    }
+  };
+
+  const filtered = useMemo(
+    () =>
+      members.filter((m) => {
+        const q = searchQuery.trim().toLowerCase();
+        if (!q) return true;
+        return (
+          m.fullName.toLowerCase().includes(q) ||
+          (m.telephone || "").includes(q)
+        );
+      }),
+    [members, searchQuery]
   );
+
+  const fmtDate = (iso?: string | null) =>
+    iso ? new Date(iso).toLocaleDateString() : "—";
 
   return (
-    <div className="space-y-6 p-4 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold text-gray-800">Finance Officer View</h2>
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Search by name, phone, or email"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-4 py-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-          <div className="absolute inset-y-0 left-2 flex items-center pointer-events-none text-gray-500">🔍</div>
-        </div>
+    <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
+      <div className="flex flex-col md:flex-row justify-between items-center">
+        <h2 className="text-2xl font-bold mb-2 md:mb-0">Finance Officer View</h2>
+        <input
+          type="text"
+          placeholder="Search by name or phone"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="border px-4 py-2 rounded w-full md:w-64"
+        />
       </div>
 
-      {/* Member List */}
-      {filteredMembers.map((member) => {
-        const history = paymentHistory[member.id] || [];
-        const paidMonths = history.map((p) => p.monthPaid);
+      {status && (
+        <div
+          className={`p-3 rounded text-sm font-medium ${
+            status.startsWith("Recorded") || status.includes("deleted")
+              ? "bg-green-100 text-green-800"
+              : "bg-red-100 text-red-800"
+          }`}
+        >
+          {status}
+        </div>
+      )}
 
-        return (
-          <div key={member.id} className="border p-4 rounded shadow">
-            <p><strong>Name:</strong> {member.fullName}</p>
-            <p><strong>Phone:</strong> {member.phone}</p>
-            <p><strong>Email:</strong> {member.email}</p>
+      {loading && <p>Loading members…</p>}
 
-            <div className="mt-2 flex flex-col md:flex-row gap-2">
-              <select
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-                className="border px-2 py-1 rounded"
-              >
-                {months.map((m) => (
-                  <option key={m} value={m}>
-                    {m} {paidMonths.includes(m) ? "✅" : ""}
-                  </option>
-                ))}
-              </select>
+      {!loading &&
+        filtered.map((member) => (
+          <div
+            key={member.id}
+            className="border rounded-lg shadow p-4 space-y-3 bg-white"
+          >
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+              <div className="space-y-1 text-sm">
+                <p className="font-semibold text-lg">{member.fullName}</p>
+                <p>📞 {member.telephone ?? "—"}</p>
+                <p>📧 {member.email ?? "—"}</p>
+                {/* <p>🏠 Address: {member.address ?? "—"}</p> */}
+                <p>💵 Monthly: ${member.monthlyPayment ?? "—"}</p>
+                <p>🏛️ Medhane-Alem: ${member.medhaneAlemPledge ?? "—"}</p>
+                <p>📅 Member since: {fmtDate(member.memberSince)}</p>
+              </div>
 
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(parseFloat(e.target.value))}
-                className="border px-2 py-1 rounded w-24"
-              />
+              <div className="flex flex-col space-y-2 mt-4 sm:mt-0">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={includePledgeByMember[member.id] || false}
+                    onChange={(e) =>
+                      setIncludePledgeByMember((prev) => ({
+                        ...prev,
+                        [member.id]: e.target.checked,
+                      }))
+                    }
+                  />
+                  Record Medhane Alem
+                </label>
 
-              <button
-                onClick={() => handleSubmitPayment(member.id)}
-                className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700"
-              >
-                Record Payment
-              </button>
+                {!includePledgeByMember[member.id] && (
+                  <>
+                    <div className="flex gap-2">
+                      <select
+                        value={fromByMember[member.id] || ""}
+                        onChange={(e) =>
+                          setFromByMember((prev) => ({
+                            ...prev,
+                            [member.id]: e.target.value,
+                          }))
+                        }
+                        className="border rounded px-2 py-1"
+                      >
+                        <option value="">From</option>
+                        {MONTHS.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        value={toByMember[member.id] || ""}
+                        onChange={(e) =>
+                          setToByMember((prev) => ({
+                            ...prev,
+                            [member.id]: e.target.value,
+                          }))
+                        }
+                        className="border rounded px-2 py-1"
+                      >
+                        <option value="">To</option>
+                        {fromByMember[member.id] &&
+                          MONTHS.slice(MONTHS.indexOf(fromByMember[member.id]!)).map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <input
+                      type="number"
+                      placeholder="Total"
+                      value={amountByMember[member.id] || ""}
+                      onChange={(e) =>
+                        setAmountByMember((prev) => ({
+                          ...prev,
+                          [member.id]: e.target.value,
+                        }))
+                      }
+                      className="border rounded px-2 py-1"
+                    />
+                  </>
+                )}
+
+                <button
+                  onClick={() => handleSubmitPayment(member)}
+                  className="bg-green-600 text-white py-1 px-3 rounded"
+                >
+                  Record Payment
+                </button>
+                <button
+                  onClick={() => togglePayments(member.id)}
+                  className="bg-blue-600 text-white py-1 px-3 rounded"
+                >
+                  {expandedMember === member.id
+                    ? "Hide Payments"
+                    : "View Payments"}
+                </button>
+              </div>
             </div>
 
-            {/* Toggle View History */}
-            <button
-              onClick={() => togglePaymentHistory(member.id)}
-              className="text-blue-600 underline text-sm mt-2"
-            >
-              {expandedMemberId === member.id ? "Hide Payment History" : "View Full Payment History"}
-            </button>
-
-            {/* Payment History */}
-            {expandedMemberId === member.id && history && (
-              <div className="mt-3 text-sm bg-gray-50 border rounded p-3">
-                <h4 className="font-medium text-gray-700 mb-2">Payment History</h4>
-                <ul className="list-disc pl-5 space-y-1">
-                  {history.map((payment, index) => (
-                    <li key={index}>
-                      <span className="font-medium">{payment.monthPaid}</span>: ${payment.amount} on{" "}
-                      {new Date(payment.paymentDate).toLocaleDateString()}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            {expandedMember === member.id &&
+              paymentsByMember[member.id] && (
+                <div className="mt-3 bg-gray-50 rounded p-3">
+                  <h3 className="font-medium mb-2">Payment History</h3>
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="border px-2 py-1 text-left">Date</th>
+                        <th className="border px-2 py-1 text-right">Amount</th>
+                        <th className="border px-2 py-1">Month</th>
+                        <th className="border px-2 py-1">Year</th>
+                        <th className="border px-2 py-1">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paymentsByMember[member.id].map((p) => {
+                        const local = new Date(`${p.paymentDate}T00:00:00`);
+                        return (
+                          <tr key={p.id}>
+                            <td className="border px-2 py-1">
+                              {local.toLocaleDateString()}
+                            </td>
+                            <td className="border px-2 py-1 text-right">
+                              ${Number(p.amount).toFixed(2)}
+                            </td>
+                            <td className="border px-2 py-1 text-center">
+                              {p.monthPaid}
+                            </td>
+                            <td className="border px-2 py-1 text-center">
+                              {local.getFullYear()}
+                            </td>
+                            <td className="border px-2 py-1 text-center">
+                              <button
+                                onClick={() =>
+                                  handleDeletePayment(member.id, p.id)
+                                }
+                                className="text-red-600 hover:underline text-xs"
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
           </div>
-        );
-      })}
-
-      {status && <p className="text-sm text-blue-700">{status}</p>}
+        ))}
     </div>
   );
-};
-
-export default FinanceOfficerView;
+}

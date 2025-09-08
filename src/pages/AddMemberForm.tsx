@@ -1,94 +1,98 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { api } from '../api/axios';
 
-// Type definitions (can be expanded later)
-interface Child {
-    name: string;
-    birthDate: string; // YYYY-MM-DD format
-    gender: string;
-}
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import  api  from "../api/api";
+import type { ChangeEvent } from "react";
+import type { MemberFormData, Child } from "../types";
 
-interface MemberFormData { // Renamed from ParentFormData
-    firstName: string;
-    lastName: string;
-    telephone: string;
-    email: string;
-    address: string; // Assuming 'city/address' means a single address field
-    spouseFirstName: string;
-    spouseLastName: string;
-    spouseTelephone: string;
-    children: Child[];
-    monthlyPayment?: number;               // ✅ Required
-    medhaneAlemPledge?: number;           // ✅ Optiona
-}
+const AddMemberForm: React.FC = () => {
+  const navigate = useNavigate();
 
-const AddMemberForm: React.FC = () => { // Renamed component
-    const navigate = useNavigate();
-    const [formData, setFormData] = useState<MemberFormData>({ // Renamed formData type
-        firstName: '',
-        lastName: '',
-        telephone: '',
-        email: '',
-        address: '',
-        spouseFirstName: '', 
-        spouseLastName: '', 
-        spouseTelephone: '', 
-        children: [],
-        monthlyPayment: undefined,
-        medhaneAlemPledge: undefined,
+  const [formData, setFormData] = useState<MemberFormData>({
+    firstName:        "",
+    lastName:         "",
+    telephone:        "",
+    email:            "",
+    address:          "",
+    spouseFirstName:  "",
+    spouseLastName:   "",
+    spouseTelephone:  "",
+    children:         [],
+    monthlyPayment:   "", 
+    medhaneAlemPledge:"",
+    memberSince: "",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitStatus, setSubmitStatus] = useState<string | null>(null);
+
+  // Generic parent-field handler
+  const handleParentChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    setErrors(prev => ({ ...prev, [name]: "" }));
+  };
+
+  // Children-field handler
+  const handleChildChange = (
+    idx: number,
+    e: ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData(prev => {
+      const kids = [...prev.children];
+      kids[idx] = { ...kids[idx], [name]: value };
+      return { ...prev, children: kids };
     });
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [submitStatus, setSubmitStatus] = useState<string | null>(null);
+    setErrors(prev => {
+      const cp = { ...prev };
+      delete cp[`childName${idx}`];
+      delete cp[`childBirthDate${idx}`];
+      delete cp[`childGender${idx}`];
+      return cp;
+    });
+  };
 
-    const handleParentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-        setErrors(prev => ({ ...prev, [name]: '' }));
-    };
+  // Add / Remove
+  const handleAddChild = () => {
+    setFormData(prev => ({
+      ...prev,
+      children: [...prev.children, { name: "", birthDate: "", gender: "" }],
+    }));
+  };
+  const handleRemoveChild = (idx: number) => {
+    setFormData(prev => ({
+      ...prev,
+      children: prev.children.filter((_, i) => i !== idx),
+    }));
+  };
 
-    const handleChildChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        const updatedChildren = formData.children.map((child, i) =>
-            i === index ? { ...child, [name]: value } : child
-        );
-        setFormData(prev => ({ ...prev, children: updatedChildren }));
-    };
+  // Simple validation
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.firstName) newErrors.firstName = "First Name is required.";
+    if (!formData.lastName)  newErrors.lastName  = "Last Name is required.";
+    if (!formData.telephone) newErrors.telephone = "Telephone is required.";
+    if (!formData.email)     newErrors.email     = "Email is required.";
+    else if (!/\S+@\S+\.\S+/.test(formData.email))
+      newErrors.email = "Email is invalid.";
+    if (!formData.address)   newErrors.address   = "Address is required.";
 
-    const handleAddChild = () => {
-        setFormData(prev => ({
-            ...prev,
-            children: [...prev.children, { name: '', birthDate: '', gender: '' }]
-        }));
-    };
+    formData.children.forEach((child, idx) => {
+      if (!child.name)      newErrors[`childName${idx}`]      = "Name is required.";
+      if (!child.birthDate) newErrors[`childBirthDate${idx}`] = "Birthdate is required.";
+      if (!child.gender)    newErrors[`childGender${idx}`]    = "Gender is required.";
+    });
 
-    const handleRemoveChild = (index: number) => {
-        setFormData(prev => ({
-            ...prev,
-            children: prev.children.filter((_, i) => i !== index)
-        }));
-    };
+    if (!formData.memberSince) {
+      newErrors.memberSince = "Required";
+    }
 
-    const validateForm = () => {
-        const newErrors: Record<string, string> = {};
-        if (!formData.firstName) newErrors.firstName = "First Name is required.";
-        if (!formData.lastName) newErrors.lastName = "Last Name is required.";
-        if (!formData.telephone) newErrors.telephone = "Telephone is required.";
-        if (!formData.email) newErrors.email = "Email is required.";
-        else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email is invalid.";
-        if (!formData.address) newErrors.address = "Address is required.";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-        formData.children.forEach((child, index) => {
-            if (!child.name) newErrors[`childName${index}`] = "Child's Name is required.";
-            if (!child.birthDate) newErrors[`childBirthDate${index}`] = "Child's Birthdate is required.";
-            if (!child.gender) newErrors[`childGender${index}`] = "Child's Gender is required.";
-        });
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
+  // Submit
+  const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   setSubmitStatus(null);
 
@@ -97,258 +101,194 @@ const AddMemberForm: React.FC = () => { // Renamed component
     return;
   }
 
-  try {
-    const response = await api.post('/church-members', formData);
-    console.log(response.data)
-    setSubmitStatus("✅ Member added successfully!");
-    setTimeout(() => navigate('/members'), 1500);
-  } catch (error: any) {
-    const message = error.response?.data || " Failed to add member.";
-    setSubmitStatus(message);
-  }
+  // Build payload ONCE
+ // Build payload ONCE
+const payload = {
+  ...formData,
+  monthlyPayment:    formData.monthlyPayment    ? Number(formData.monthlyPayment)    : null,
+  medhaneAlemPledge: formData.medhaneAlemPledge ? Number(formData.medhaneAlemPledge) : null,
+  spouseFirstName:   formData.spouseFirstName?.trim() || null,
+  spouseLastName:    formData.spouseLastName?.trim()  || null,
+  spouseTelephone:   formData.spouseTelephone?.trim() || null,
 };
 
-    return (
-        <div className="max-w-2xl mx-auto p-6 bg-white rounded-xl shadow-md my-8">
-            <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">Add New Member & Children</h1> {/* Updated title */}
+try {
+  const raw = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
 
-            {submitStatus && (
-                <div className={`mb-4 p-3 rounded ${submitStatus.includes("Error") ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
-                    {submitStatus}
-                </div>
-            )}
+  console.log("SENT TOKEN:", raw ? raw.slice(0, 30) + "..." : "(none)");
 
-            <form onSubmit={handleSubmit}>
-                <h2 className="text-xl font-semibold text-gray-700 mb-4">Member Information</h2> {/* Updated title */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div>
-                        <label htmlFor="firstName" className="block text-gray-700 text-sm font-bold mb-2">First Name:</label>
-                        <input
-                            type="text"
-                            id="firstName"
-                            name="firstName"
-                            value={formData.firstName}
-                            onChange={handleParentChange}
-                            className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${errors.firstName ? 'border-red-500' : ''}`}
-                        />
-                        {errors.firstName && <p className="text-red-500 text-xs italic">{errors.firstName}</p>}
-                    </div>
-                    <div>
-                        <label htmlFor="lastName" className="block text-gray-700 text-sm font-bold mb-2">Last Name:</label>
-                        <input
-                            type="text"
-                            id="lastName"
-                            name="lastName"
-                            value={formData.lastName}
-                            onChange={handleParentChange}
-                            className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${errors.lastName ? 'border-red-500' : ''}`}
-                        />
-                        {errors.lastName && <p className="text-red-500 text-xs italic">{errors.lastName}</p>}
-                    </div>
-                    <div>
-                        <label htmlFor="telephone" className="block text-gray-700 text-sm font-bold mb-2">Telephone:</label>
-                        <input
-                            type="tel"
-                            id="telephone"
-                            name="telephone"
-                            value={formData.telephone}
-                            onChange={handleParentChange}
-                            className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${errors.telephone ? 'border-red-500' : ''}`}
-                        />
-                        {errors.telephone && <p className="text-red-500 text-xs italic">{errors.telephone}</p>}
-                    </div>
-                    <div>
-                        <label htmlFor="email" className="block text-gray-700 text-sm font-bold mb-2">Email:</label>
-                        <input
-                            type="email"
-                            id="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleParentChange}
-                            className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${errors.email ? 'border-red-500' : ''}`}
-                        />
-                        {errors.email && <p className="text-red-500 text-xs italic">{errors.email}</p>}
-                    </div>
-                    <div className="col-span-full">
-                        <label htmlFor="address" className="block text-gray-700 text-sm font-bold mb-2">Address (City/State):</label>
-                        <input
-                            type="text"
-                            id="address"
-                            name="address"
-                            value={formData.address}
-                            onChange={handleParentChange}
-                            className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${errors.address ? 'border-red-500' : ''}`}
-                        />
-                        {errors.address && <p className="text-red-500 text-xs italic">{errors.address}</p>}
-                    </div>
-                </div>
+  if (raw) {
+    try {
+      // 👇 rename to avoid shadowing your request payload
+      const jwtPayload = JSON.parse(atob(raw.split(".")[1].replace(/-/g, '+').replace(/_/g, '/')));
+      console.log("TOKEN PAYLOAD:", jwtPayload);
+      const expMs = Number(jwtPayload?.exp) * 1000;
+      if (Number.isFinite(expMs) && Date.now() >= expMs) {
+        setSubmitStatus("Your session has expired. Please sign in again.");
+        return;
+      }
+      const roles = Array.isArray(jwtPayload?.roles) ? jwtPayload.roles : [];
+      if (!roles.includes("ADMIN") && !roles.includes("FINANCE_MANAGER")) {
+        console.warn("⚠️ Token missing required role. roles=", roles);
+      }
+    } catch (e) {
+      console.warn("Could not decode JWT payload:", e);
+    }
+  } else {
+    delete (api.defaults.headers.common as any).Authorization;
+  }
 
-                <h2 className="text-xl font-semibold text-gray-700 mb-4 mt-8">Spouse Information (Optional)</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div>
-                        <label htmlFor="spouseFirstName" className="block text-gray-700 text-sm font-bold mb-2">Spouse First Name:</label>
-                        <input
-                            type="text"
-                            id="spouseFirstName"
-                            name="spouseFirstName"
-                            value={formData.spouseFirstName}
-                            onChange={handleParentChange}
-                            className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${errors.spouseFirstName ? 'border-red-500' : ''}`}
-                            // removed 'required' as it's optional
-                        />
-                        {errors.spouseFirstName && <p className="text-red-500 text-xs italic">{errors.spouseFirstName}</p>}
-                    </div>
-                    <div>
-                        <label htmlFor="spouseLastName" className="block text-gray-700 text-sm font-bold mb-2">Spouse Last Name:</label>
-                        <input
-                            type="text"
-                            id="spouseLastName"
-                            name="spouseLastName"
-                            value={formData.spouseLastName}
-                            onChange={handleParentChange}
-                            className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${errors.spouseLastName ? 'border-red-500' : ''}`}
-                            // removed 'required' as it's optional
-                        />
-                        {errors.spouseLastName && <p className="text-red-500 text-xs italic">{errors.spouseLastName}</p>}
-                    </div>
-                    <div className="md:col-span-2">
-                        <label htmlFor="spouseTelephone" className="block text-gray-700 text-sm font-bold mb-2">Spouse Telephone:</label>
-                        <input
-                            type="tel"
-                            id="spouseTelephone"
-                            name="spouseTelephone"
-                            value={formData.spouseTelephone}
-                            onChange={handleParentChange}
-                            className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${errors.spouseTelephone ? 'border-red-500' : ''}`}
-                            // removed 'required' as it's optional
-                        />
-                        {errors.spouseTelephone && <p className="text-red-500 text-xs italic">{errors.spouseTelephone}</p>}
-                    </div>
-                    <div className="col-span-full">
-                        <label htmlFor="monthlyPayment" className="block text-gray-700 text-sm font-bold mb-2">
-                            Monthly Membership Payment:
-                        </label>
-                        <input
-                            type="number"
-                            id="monthlyPayment"
-                            name="monthlyPayment"
-                            value={formData.monthlyPayment}
-                            onChange={(e) =>
-                            setFormData((prev) => ({
-                                ...prev,
-                                monthlyPayment: Number(e.target.value),
-                            }))
-                            }
-                            className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${
-                            errors.monthlyPayment ? 'border-red-500' : ''
-                            }`}
-                        />
-                        {errors.monthlyPayment && (
-                            <p className="text-red-500 text-xs italic">{errors.monthlyPayment}</p>
-                        )}
-                        </div>
+  console.log("AddMember payload:", payload);
 
-                        <div className="col-span-full">
-                        <label htmlFor="medhaneAlemPledge" className="block text-gray-700 text-sm font-bold mb-2">
-                            Medhane Alem Payment <span className="text-gray-500">(Optional)</span>:
-                        </label>
-                        <input
-                            type="number"
-                            id="medhaneAlemPledge"
-                            name="medhaneAlemPledge"
-                            value={formData.medhaneAlemPledge ?? ''}
-                            onChange={(e) =>
-                            setFormData((prev) => ({
-                                ...prev,
-                                medhaneAlemPledge: e.target.value ? Number(e.target.value) : undefined,
-                            }))
-                            }
-                            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                        />
-                        </div>
+  const res = await api.post("/church-members/register", payload, {
+    headers: raw ? { Authorization: `Bearer ${raw}` } : {},
+  });
 
-                </div>
+  setSubmitStatus("✅ Member added successfully!");
+  setTimeout(() => navigate("/members"), 1500);
+} catch (err: any) {
+  const status = err.response?.status;
+  const serverMsg =
+    typeof err.response?.data === "string"
+      ? err.response.data
+      : err.response?.data?.message;
 
-                <h2 className="text-xl font-semibold text-gray-700 mb-4 mt-8">Children Information</h2>
-                {formData.children.map((child, index) => (
-                    <div key={index} className="border p-4 rounded-lg mb-4 bg-gray-50 relative">
-                        <h3 className="text-lg font-medium text-gray-800 mb-3">Child #{index + 1}</h3>
-                        <button
-                            type="button"
-                            onClick={() => handleRemoveChild(index)}
-                            className="absolute top-3 right-3 text-red-500 hover:text-red-700 font-bold"
-                        >
-                            &times; Remove
-                        </button>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor={`childName${index}`} className="block text-gray-700 text-sm font-bold mb-2">Name:</label>
-                                <input
-                                    type="text"
-                                    id={`childName${index}`}
-                                    name="name"
-                                    value={child.name}
-                                    onChange={(e) => handleChildChange(index, e)}
-                                    className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${errors[`childName${index}`] ? 'border-red-500' : ''}`}
-                                />
-                                {errors[`childName${index}`] && <p className="text-red-500 text-xs italic">{errors[`childName${index}`]}</p>}
-                            </div>
-                            <div>
-                                <label htmlFor={`childBirthDate${index}`} className="block text-gray-700 text-sm font-bold mb-2">Birthdate:</label>
-                                <input
-                                    type="date"
-                                    id={`childBirthDate${index}`}
-                                    name="birthDate"
-                                    value={child.birthDate}
-                                    onChange={(e) => handleChildChange(index, e)}
-                                    className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${errors[`childBirthDate${index}`] ? 'border-red-500' : ''}`}
-                                />
-                                {errors[`childBirthDate${index}`] && <p className="text-red-500 text-xs italic">{errors[`childBirthDate${index}`]}</p>}
-                            </div>
-                            <div className="md:col-span-2">
-                                <label htmlFor={`childGender${index}`} className="block text-gray-700 text-sm font-bold mb-2">Gender:</label>
-                                <select
-                                    id={`childGender${index}`}
-                                    name="gender"
-                                    value={child.gender}
-                                    onChange={(e) => handleChildChange(index, e)}
-                                    className={`shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline ${errors[`childGender${index}`] ? 'border-red-500' : ''}`}
-                                >
-                                    <option value="">Select Gender</option>
-                                    <option value="male">Male</option>
-                                    <option value="female">Female</option>
-                                </select>
-                                {errors[`childGender${index}`] && <p className="text-red-500 text-xs italic">{errors[`childGender${index}`]}</p>}
-                            </div>
-                        </div>
-                    </div>
-                ))}
-                <button
-                    type="button"
-                    onClick={handleAddChild}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors mb-6"
-                >
-                    Add Child
-                </button>
+  if (status === 401)       setSubmitStatus(serverMsg || "Your session is invalid or expired. Please sign in again.");
+  else if (status === 403)  setSubmitStatus(serverMsg || "You’re signed in but not allowed to do this (forbidden).");
+  else if (status === 409)  setSubmitStatus(serverMsg || "Email or phone already exists.");
+  else                      setSubmitStatus(serverMsg || "Failed to add member.");
+}
 
-                <div className="flex justify-end space-x-3 mt-6">
-                    <button
-                        type="button"
-                        onClick={() => navigate('/members/list')} // Back button
-                        className="px-6 py-3 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors shadow-lg"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        className="px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-lg"
-                    >
-                        Save Member
-                    </button>
-                </div>
-            </form>
+
+
+};  
+
+
+
+  return (
+    <div className="max-w-2xl mx-auto p-6 bg-white rounded-xl shadow-md my-8">
+      <h1 className="text-2xl font-bold mb-6 text-center">Add New Member & Children</h1>
+
+      {submitStatus && (
+        <div
+          className={`mb-4 p-3 rounded ${
+            submitStatus.startsWith("Failed") ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+          }`}
+        >
+          {submitStatus}
         </div>
-    );
+      )}
+
+      <form onSubmit={handleSubmit}>
+        {/* Parent info */}
+        <h2 className="text-xl font-semibold mb-4">Member Information</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {[
+            { label: "First Name",        name: "firstName",          type: "text"   },
+            { label: "Last Name",         name: "lastName",           type: "text"   },
+            { label: "Telephone",         name: "telephone",          type: "tel"    },
+            { label: "Email",             name: "email",              type: "email"  },
+            { label: "Address",           name: "address",            type: "text"   },
+            { label: "Monthly Payment",   name: "monthlyPayment",     type: "number" },
+            { label: "Medhane Alem Pledge", name: "medhaneAlemPledge",type: "number" },
+            { label: "Member Since", name: "memberSince",               type: "date" },
+            { label: "Spouse First Name", name: "spouseFirstName",    type: "text"   },
+            { label: "Spouse Last Name",  name: "spouseLastName",     type: "text"   },
+            { label: "Spouse Telephone",  name: "spouseTelephone",    type: "tel"    },
+          ].map(({ label, name, type }) => (
+            <div key={name}>
+              <label className="block mb-1">{label}:</label>
+              <input
+                name={name}
+                type={type}
+                value={(formData as any)[name] ?? ""}
+                onChange={handleParentChange}
+                className={`w-full border rounded p-2 ${
+                  errors[name] ? "border-red-500" : ""
+                }`}
+              />
+              {errors[name] && <p className="text-red-500 text-xs">{errors[name]}</p>}
+            </div>
+          ))}
+        </div>
+
+        {/* Children */}
+        <h2 className="text-xl font-semibold mb-4">Children Information</h2>
+        {formData.children.map((child, idx) => (
+          <div key={idx} className="mb-4 p-4 border rounded bg-gray-50">
+            <div className="flex justify-between items-center mb-2">
+              <strong>Child #{idx + 1}</strong>
+              <button
+                type="button"
+                onClick={() => handleRemoveChild(idx)}
+                className="text-red-600 hover:underline"
+              >
+                Remove
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <input
+                name="name"
+                placeholder="Name"
+                value={child.name}
+                onChange={e => handleChildChange(idx, e)}
+                className="border rounded p-2"
+              />
+              <input
+                name="birthDate"
+                type="date"
+                value={child.birthDate}
+                onChange={e => handleChildChange(idx, e)}
+                className="border rounded p-2"
+              />
+              <select
+                name="gender"
+                value={child.gender}
+                onChange={e => handleChildChange(idx, e)}
+                className="border rounded p-2"
+              >
+                <option value="">Select Gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </div>
+            {(errors[`childName${idx}`] ||
+              errors[`childBirthDate${idx}`] ||
+              errors[`childGender${idx}`]) && (
+              <p className="text-red-500 text-xs mt-1">
+                {errors[`childName${idx}`] ??
+                  errors[`childBirthDate${idx}`] ??
+                  errors[`childGender${idx}`]}
+              </p>
+            )}
+          </div>
+        ))}
+
+        <button
+          type="button"
+          onClick={handleAddChild}
+          className="bg-gray-200 px-4 py-2 rounded mb-6"
+        >
+          Add Child
+        </button>
+
+        {/* Actions */}
+        <div className="flex justify-end gap-4">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="bg-gray-300 px-4 py-2 rounded"
+          >
+            Cancel
+          </button>
+          <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded">
+            Save Member
+          </button>
+        </div>
+      </form>
+    </div>
+  );
 };
 
 export default AddMemberForm;
+

@@ -10,10 +10,10 @@ export interface Teacher {
 }
 
 interface TeachersListProps {
-  endpoint?: string; // Optional override
+  apiEndpoint?: string;
 }
 
-const TeachersList: React.FC<TeachersListProps> = ({ endpoint = '/api/education/teachers' }) => {
+const TeachersList: React.FC<TeachersListProps> = ({ apiEndpoint = '/api/education/teachers' }) => {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,8 +22,13 @@ const TeachersList: React.FC<TeachersListProps> = ({ endpoint = '/api/education/
   const loadTeachers = async () => {
     setLoading(true);
     try {
-      const resp = await axios.get<Teacher[]>(endpoint);
-      setTeachers(resp.data);
+      const resp = await axios.get<Teacher[]>(apiEndpoint);
+      if (Array.isArray(resp.data)) {
+        setTeachers(resp.data);
+      } else {
+        console.error('Expected array but got', resp.data);
+        setTeachers([]);
+      }
       setError(null);
     } catch (err) {
       console.error('Failed to fetch teachers', err);
@@ -35,12 +40,12 @@ const TeachersList: React.FC<TeachersListProps> = ({ endpoint = '/api/education/
 
   useEffect(() => {
     loadTeachers();
-  }, [endpoint]);
+  }, [apiEndpoint]);
 
   const handleDelete = async (id: number) => {
     if (!window.confirm('Delete this teacher?')) return;
     try {
-      await axios.delete(`${endpoint}/${id}`);
+      await axios.delete(`${apiEndpoint}/${id}`);
       loadTeachers();
     } catch (err) {
       console.error('Failed to delete teacher', err);
@@ -71,14 +76,14 @@ const TeachersList: React.FC<TeachersListProps> = ({ endpoint = '/api/education/
               <td className="px-4 py-2 space-x-2">
                 <button
                   type="button"
-                  onClick={() => navigate(`${endpoint}/${t.id}`)}
+                  onClick={() => navigate(`/education/tigrigna-study/teachers/${t.id}`)}
                   className="text-blue-600 hover:underline text-sm"
                 >
                   View
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate(`${endpoint}/${t.id}/edit`)}
+                  onClick={() => navigate(`/education/tigrigna-study/teachers/${t.id}/edit`)}
                   className="text-green-600 hover:underline text-sm"
                 >
                   Edit

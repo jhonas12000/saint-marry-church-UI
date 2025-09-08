@@ -1,55 +1,97 @@
+// src/components/members/MembersListView.tsx
 import React from 'react';
-import { useNavigate } from 'react-router-dom'; 
+import { useNavigate } from 'react-router-dom';
+import api from "../../api/api";
+import axios from 'axios';
 
-// Member type (consistent with MembersTableView)
 type Member = {
   id: number;
   firstName: string;
   lastName: string;
-  fullName: string;
-  phone: string;
   email: string;
+  telephone: string;
   address?: string;
-  monthlyPayment?: string;
+  monthlyPayment?: number;
+  medhaneAlemPledge?: number;
 };
 
-// Mock data (consistent with MembersTableView)
-const mockMembers: Member[] = [
-  { id: 1, firstName: "Yonas", lastName: "Weldemichael", fullName: "Yonas Weldemichael", phone: "(510) 123-4567", email: "yonas@example.com" },
-  { id: 2, firstName: "Ruth", lastName: "Abraham", fullName: "Ruth Abraham", phone: "(408) 765-4321", email: "ruth@example.com" },
-  { id: 3, firstName: "Michael", lastName: "Solomon", fullName: "Michael Solomon", phone: "(650) 987-6543", email: "michael@example.com", address: "San Francisco, CA", monthlyPayment: "$60" },
-];
+interface MembersListViewProps {
+  members: Member[];
+  refreshMembers: () => void;
+}
 
-const MembersListView: React.FC = () => {
-    const navigate = useNavigate();
-    const members = mockMembers; 
+const MembersListView: React.FC<MembersListViewProps> = ({ members, refreshMembers }) => {
+  const navigate = useNavigate();
 
-    // Function to handle viewing member profile
-    const handleViewProfile = (id: number) => {
-        navigate(`/members/${id}`);
-    };
+  const handleViewProfile = (id: number) => {
+    // debug log (optional)
+    console.log('Navigating to member profile:', id);
+    navigate(`/members/${id}`);
+  };
 
-    return (
-        <div className="p-6 bg-white rounded-xl shadow-md">
-            {/* REMOVED: h1 title for this specific view - the main title is in Members.tsx */}
-            {/* REMOVED: Navigation buttons - these belong ONLY in Members.tsx */}
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("Are you sure you want to delete this member?")) return;
 
-            {members.length === 0 ? (
-                <p className="text-gray-600">No members found in mock data.</p>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {members.map(member => (
-                        <div key={member.id} className="bg-gray-50 p-4 rounded-lg shadow-sm hover:shadow-md transition cursor-pointer" onClick={() => handleViewProfile(member.id)}>
-                            <h3 className="font-semibold text-lg text-gray-800">{member.firstName} {member.lastName}</h3>
-                            <p className="text-gray-600 text-sm"><span className="font-medium">Email:</span> {member.email}</p>
-                            <p className="text-gray-600 text-sm"><span className="font-medium">Phone:</span> {member.phone}</p>
-                            <button onClick={(e) => { e.stopPropagation(); handleViewProfile(member.id); }} className="mt-2 text-blue-600 hover:underline text-sm">View Profile</button>
-                        </div>
-                    ))}
-                </div>
-            )}
+    try {
+     await api.delete(`/church-members/${id}`);
+      alert("✅ Member deleted successfully!");
+      refreshMembers();
+    } catch (error) {
+      console.error("Failed to delete member", error);
+      alert("❌ Failed to delete member.");
+    }
+  };
+
+  return (
+    <div className="p-6 bg-white rounded-xl shadow-md">
+      {members.length === 0 ? (
+        <p className="text-gray-600">No members found.</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {members.map((member) => (
+            <div
+              key={member.id}
+              className="bg-gray-50 p-4 rounded-lg shadow-sm hover:shadow-md transition cursor-pointer relative"
+              onClick={() => handleViewProfile(member.id)}
+            >
+              <h3 className="font-semibold text-lg text-gray-800">
+                {member.firstName} {member.lastName}
+              </h3>
+              <p className="text-gray-600 text-sm">
+                <span className="font-medium">Email:</span> {member.email}
+              </p>
+              <p className="text-gray-600 text-sm">
+                <span className="font-medium">Phone:</span> {member.telephone}
+              </p>
+
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewProfile(member.id);
+                  }}
+                  className="text-blue-600 hover:underline text-sm"
+                >
+                  View Profile
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(member.id);
+                  }}
+                  className="text-red-600 hover:underline text-sm"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-    );
+      )}
+    </div>
+  );
 };
 
 export default MembersListView;
