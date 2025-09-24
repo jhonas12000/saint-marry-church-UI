@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import  api  from "../api/api";
 import type { ChangeEvent } from "react";
-import type { MemberFormData, Child } from "../types";
+import type { MemberFormData } from "../types";
 
 const AddMemberForm: React.FC = () => {
   const navigate = useNavigate();

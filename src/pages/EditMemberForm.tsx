@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import type { ChangeEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import  api  from "../api/api";
-import type { MemberFormData, Child } from "../types";
+import type { MemberFormData} from "../types";
 
 const EditMemberForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();

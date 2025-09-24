@@ -1,5 +1,6 @@
 import React from "react";
-import { signOutAndRedirect } from "../auth/storage";
+//import { signOutAndRedirect } from "../auth/storage";
+import { signOutAndRedirect } from "../auth/storage.tsx";
 
 const SignOutButton: React.FC<{ className?: string }> = ({ className }) => {
   return (

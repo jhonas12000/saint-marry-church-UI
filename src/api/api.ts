@@ -1,32 +1,50 @@
-
 import axios from "axios";
 import { getToken, signOutAndRedirect } from "../auth/storage.tsx";
 
-const api = axios.create({ baseURL: "http://localhost:8080/api" });
+// Local dev baseURL already includes /api
+const api = axios.create({
+  baseURL: "http://localhost:8080/api",
+  withCredentials: false,
+});
 
-// Attach Authorization header when token exists
+// Public auth endpoints — never send Authorization and never auto-redirect on 401
+const isPublicAuthFlow = (url: string) => {
+  // NOTE: url here is the request path relative to baseURL, e.g. "/auth/validate-invite"
+  return (
+    url.includes("/auth/signin") ||
+    url.includes("/auth/validate-invite") ||
+    url.includes("/auth/signup-with-invite") ||
+    url.includes("/auth/forgot-password") ||
+    url.includes("/auth/reset-password")
+  );
+};
+
+// Attach token except on public auth flows
 api.interceptors.request.use((config) => {
-  const token = getToken();
-
   config.headers = config.headers ?? {};
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-    // Avoid logging the raw token for security; log presence only if needed.
-    // console.debug("AUTH -> present");
+  const token = getToken();
+  const reqUrl = (config.url || "").toString();
+
+  if (isPublicAuthFlow(reqUrl)) {
+    delete (config.headers as any).Authorization;
+  } else if (token) {
+    (config.headers as any).Authorization = `Bearer ${token}`;
   } else {
     delete (config.headers as any).Authorization;
-    delete (api.defaults.headers.common as any).Authorization;
-    // console.debug("AUTH -> none");
   }
   return config;
 });
 
-// Auto sign-out on 401 (token expired/invalid)
+// Only redirect to /signin on 401 for NON-public endpoints
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err?.response?.status === 401) {
+    const status = err?.response?.status;
+    const url = (err?.config?.url || "").toString();
+
+    if (status === 401 && !isPublicAuthFlow(url)) {
       signOutAndRedirect();
+      return new Promise(() => {}); // stop further handling after redirect
     }
     return Promise.reject(err);
   }

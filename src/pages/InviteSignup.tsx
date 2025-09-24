@@ -5,9 +5,10 @@ import { useAuth } from "../auth/AuthProvider";
 import type { AuthResponse } from "../auth/types";
 
 type ValidateInviteResponse = {
-  email: string;
-  role: string;
-  expiresAt: string;
+  email?: string | null;
+  role?: string | null;
+  expiresAt?: string | null;
+  valid?: boolean; // optional, in case your backend returns it
 };
 
 type SignupForm = {
@@ -18,11 +19,23 @@ type SignupForm = {
   password: string;
 };
 
-const InviteSignup: React.FC = () => {
-  const { token: pathToken } = useParams<{ token: string }>();
-  const [qs] = useSearchParams();
-  const token = pathToken || qs.get("token") || "";
+// --- Extract token robustly: /invite/:token OR /invite?token=... OR /invite?t=... OR hash ---
+function useInviteToken(): string {
+  const { token: tokenFromPath } = useParams<{ token: string }>();
+  const [sp] = useSearchParams();
+  const hashParams = new URLSearchParams(window.location.hash?.slice(1) || "");
 
+  return (
+    (tokenFromPath ?? "").trim() ||
+    (sp.get("token") ?? "").trim() ||
+    (sp.get("t") ?? "").trim() ||
+    (hashParams.get("token") ?? "").trim() ||
+    (hashParams.get("t") ?? "").trim()
+  );
+}
+
+const InviteSignup: React.FC = () => {
+  const token = useInviteToken();
   const navigate = useNavigate();
   const { signin } = useAuth();
 
@@ -38,6 +51,7 @@ const InviteSignup: React.FC = () => {
     password: "",
   });
 
+  // Validate invite on mount
   useEffect(() => {
     let mounted = true;
 
@@ -49,19 +63,23 @@ const InviteSignup: React.FC = () => {
 
     (async () => {
       try {
-        // Use the endpoint your backend actually exposes:
-        // EITHER query form:
-        const res = await api.get<ValidateInviteResponse>("/api/auth/validate-invite", {
+        // Query-style validate (permitAll)
+        const res = await api.get<ValidateInviteResponse>("/auth/validate-invite", {
           params: { token },
         });
-
-        // If you wired the path variant instead, use:
-        // const res = await api.get<ValidateInviteResponse>(`/api/auth/validate-invite/${token}`);
-
         if (!mounted) return;
-        setInvite(res.data);
+        // If backend returns {valid:false}, treat as error
+        if (res.data && res.data.valid === false) {
+          setError("This invite is invalid, expired, or already used.");
+        } else {
+          setInvite(res.data ?? {});
+        }
       } catch (e: any) {
-        setError(e?.response?.data?.message ?? "This invite is invalid, expired, or already used.");
+        const msg =
+          e?.response?.data?.message ??
+          e?.response?.data?.error ??
+          "This invite is invalid, expired, or already used.";
+        setError(msg);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -73,60 +91,123 @@ const InviteSignup: React.FC = () => {
   }, [token]);
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    setForm((f) => ({ ...f, [name]: value }));
   };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
     try {
-      const res = await api.post<AuthResponse>("/api/auth/signup-with-invite", {
+      const res = await api.post<AuthResponse>("/auth/signup-with-invite", {
         token,
         ...form,
       });
-      signin(res.data);            // store JWT per your AuthProvider
-      navigate("/dashboard");      // or wherever you want to land
+
+      // Store auth (JWT, user) then go to your app home
+      signin(res.data);
+      navigate("/", { replace: true });
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? "Signup failed. Please try again.");
+      const msg =
+        e?.response?.data?.message ??
+        e?.response?.data?.error ??
+        "Signup failed. Please try again.";
+      setError(msg);
     }
   };
 
-  if (loading) return <div style={{ padding: 24 }}>Checking your invite…</div>;
-  if (error) return <div style={{ padding: 24, color: "crimson" }}>{error}</div>;
-  if (!invite) return null;
+  if (loading) {
+    return <div className="p-6">Checking your invite…</div>;
+  }
+
+  if (!token) {
+    return <div className="p-6 text-red-600">This invite link is missing a token.</div>;
+  }
+
+  if (error) {
+    return <div className="p-6 text-red-600">{error}</div>;
+  }
+
+  // invite may be null if the backend returns nothing; handle gracefully
+  const invitedEmail = invite?.email ?? "(email will be collected)";
+  const invitedRole = invite?.role ?? "(role)";
 
   return (
-    <div style={{ maxWidth: 520, margin: "40px auto", padding: 24, border: "1px solid #eee", borderRadius: 12 }}>
-      <h2>Set up your account</h2>
-      <p style={{ color: "#555" }}>
-        Invited email: <b>{invite.email}</b> &nbsp;•&nbsp; Role: <b>{invite.role}</b>
+    <div className="max-w-xl mx-auto my-10 px-6 py-6 bg-white rounded-2xl shadow">
+      <h1 className="text-2xl font-semibold mb-2">Complete your signup</h1>
+      <p className="text-sm text-gray-600 mb-4">
+        Invited email: <b>{invitedEmail}</b>
+        {invitedRole ? <> &nbsp;•&nbsp; Role: <b>{invitedRole}</b></> : null}
       </p>
 
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: 12 }}>
-        <label>
-          First name
-          <input name="firstName" value={form.firstName} onChange={onChange} required />
-        </label>
-        <label>
-          Last name
-          <input name="lastName" value={form.lastName} onChange={onChange} required />
-        </label>
-        <label>
-          Phone
-          <input name="phone" value={form.phone ?? ""} onChange={onChange} />
-        </label>
-        <label>
-          Username (optional)
-          <input name="username" value={form.username ?? ""} onChange={onChange} />
-        </label>
-        <label>
-          Password
-          <input name="password" type="password" value={form.password} onChange={onChange} required />
+      {invite?.expiresAt && (
+        <p className="text-xs text-gray-500 mb-4">
+          This invite expires on <b>{new Date(invite.expiresAt).toLocaleString()}</b>.
+        </p>
+      )}
+
+      <form onSubmit={onSubmit} className="grid gap-3">
+        <label className="grid gap-1">
+          <span className="text-sm">First name</span>
+          <input
+            className="border rounded-xl px-3 py-2"
+            name="firstName"
+            value={form.firstName}
+            onChange={onChange}
+            required
+          />
         </label>
 
-        {error && <div style={{ color: "crimson" }}>{error}</div>}
+        <label className="grid gap-1">
+          <span className="text-sm">Last name</span>
+          <input
+            className="border rounded-xl px-3 py-2"
+            name="lastName"
+            value={form.lastName}
+            onChange={onChange}
+            required
+          />
+        </label>
 
-        <button type="submit" style={{ padding: "10px 14px" }}>
+        <label className="grid gap-1">
+          <span className="text-sm">Phone (optional)</span>
+          <input
+            className="border rounded-xl px-3 py-2"
+            name="phone"
+            value={form.phone ?? ""}
+            onChange={onChange}
+          />
+        </label>
+
+        <label className="grid gap-1">
+          <span className="text-sm">Username (optional)</span>
+          <input
+            className="border rounded-xl px-3 py-2"
+            name="username"
+            value={form.username ?? ""}
+            onChange={onChange}
+          />
+        </label>
+
+        <label className="grid gap-1">
+          <span className="text-sm">Password</span>
+          <input
+            className="border rounded-xl px-3 py-2"
+            name="password"
+            type="password"
+            value={form.password}
+            onChange={onChange}
+            required
+          />
+        </label>
+
+        {error && <div className="text-red-600 text-sm">{error}</div>}
+
+        <button
+          type="submit"
+          className="mt-2 py-2 rounded-2xl bg-black text-white hover:opacity-90"
+        >
           Create account
         </button>
       </form>

@@ -54,14 +54,12 @@ const PizzaFamilyPage: React.FC = () => {
   const location = useLocation() as { state?: { message?: string; from?: string } };
   const successMsg = location.state?.message;
 
-  const SIDEBAR_ROUTE = "/"; // change if your sidebar/landing route is different
+  //const SIDEBAR_ROUTE = "/members"; // change if your sidebar/landing route is different
 
   function goBackToSidebar() {
-    const from = location.state?.from;
-    if (from) return navigate(from);
-    if (window.history.length > 1) return navigate(-1);
-    navigate(SIDEBAR_ROUTE);
-  }
+  // Always land on Members; don't rely on history or state
+  navigate("/members", { replace: true });
+}
 
   async function refresh() {
     setLoading(true);

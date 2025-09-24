@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import api from "../api/api";
  // baseURL should be http://localhost:8080/api
 
-type Role = "ADMIN" | "MEMBER" | "CHAIRMAN" | "FINANCE_MANAGER" | "EDUCATION_LEAD" | "SECRETARY";
+type Role = "ADMIN" | "MEMBER" | "CHAIRPERSON" | "FINANCE_MANAGER" | "EDUCATION_LEAD" | "SECRETARY";
 
 type SignupForm = {
   firstName: string;

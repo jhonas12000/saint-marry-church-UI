@@ -1,30 +1,37 @@
-import React, { useEffect, useState } from "react";
+
+import  { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import  api  from "../api/api";
-import type { MemberDTO, Child } from "../types";
+import api from "../api/api";
+import type { MemberDTO as BaseMemberDTO, Child } from "../types";
+
+// Ensure this file "sees" medhaneAlemPledge on the DTO even if a stale type is imported elsewhere
+type MemberDTO = BaseMemberDTO & { medhaneAlemPledge?: number | null };
 
 interface Payment {
   id: number;
   amount: number;
   monthPaid: string;
-  paymentDate: string;  // "YYYY-MM-DD"
+  paymentDate: string; // "YYYY-MM-DD"
   memberSince: string;
 }
 
-export default function MemberProfile(): JSX.Element {
-  const { id } = useParams<{ id: string }>();
+export default function MemberProfile() {
+  // Explicitly type params so `id` is recognized; it can be string | undefined
+  const params = useParams<{ id: string }>();
+  const id = params.id; // string | undefined
   const navigate = useNavigate();
 
-  const [member,  setMember]  = useState<MemberDTO | null>(null);
-  const [payments,setPayments] = useState<Payment[]>([]);
-  const [status,  setStatus]  = useState<string>("");
+  const [member, setMember] = useState<MemberDTO | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [status, setStatus] = useState<string>("");
 
   // Fetch member (including children)
   useEffect(() => {
-    if (!id) return;
-    api.get<MemberDTO>(`/church-members/${id}`)
-      .then(res => setMember(res.data))
-      .catch(err => {
+    if (!id) return; // narrow undefined
+    api
+      .get<MemberDTO>(`/church-members/${id}`)
+      .then((res) => setMember(res.data))
+      .catch((err) => {
         console.error("Error loading member", err);
         setStatus("Failed to load member.");
       });
@@ -33,9 +40,10 @@ export default function MemberProfile(): JSX.Element {
   // Fetch payments
   useEffect(() => {
     if (!id) return;
-    api.get<Payment[]>(`/payments/member/${id}`)
-      .then(res => setPayments(res.data))
-      .catch(err => {
+    api
+      .get<Payment[]>(`/payments/member/${id}`)
+      .then((res) => setPayments(res.data))
+      .catch((err) => {
         console.error("Error loading payments", err);
         setStatus("Failed to load payments.");
       });
@@ -88,18 +96,38 @@ export default function MemberProfile(): JSX.Element {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div>
-          <p><strong>Phone:</strong> {member.telephone}</p>
-          <p><strong>Email:</strong> {member.email}</p>
-          <p><strong>Address:</strong> {member.address}</p>
-          <p><strong>Monthly Payment:</strong> {member.monthlyPayment ?? "—"}</p>
-          <p><strong>Medhane-Alem:</strong> {member.medhaneAlemPledge?? "—"}</p>
-          <p><strong>Member since: {member.memberSince}</strong></p>
+          <p>
+            <strong>Phone:</strong> {member.telephone}
+          </p>
+          <p>
+            <strong>Email:</strong> {member.email}
+          </p>
+          <p>
+            <strong>Address:</strong> {member.address}
+          </p>
+          <p>
+            <strong>Monthly Payment:</strong>{" "}
+            {member.monthlyPayment ?? "—"}
+          </p>
+          <p>
+            <strong>Medhane-Alem:</strong>{" "}
+            {member.medhaneAlemPledge ?? "—"}
+          </p>
+          <p>
+            <strong>Member since: {member.memberSince}</strong>
+          </p>
         </div>
         <div>
           <h2 className="font-semibold">Spouse Information</h2>
-          <p><strong>First Name:</strong> {member.spouseFirstName || "—"}</p>
-          <p><strong>Last Name:</strong>  {member.spouseLastName  || "—"}</p>
-          <p><strong>Telephone:</strong> {member.spouseTelephone || "—"}</p>
+          <p>
+            <strong>First Name:</strong> {member.spouseFirstName || "—"}
+          </p>
+          <p>
+            <strong>Last Name:</strong> {member.spouseLastName || "—"}
+          </p>
+          <p>
+            <strong>Telephone:</strong> {member.spouseTelephone || "—"}
+          </p>
         </div>
       </div>
 
@@ -109,9 +137,15 @@ export default function MemberProfile(): JSX.Element {
         <ul className="list-disc pl-5 mb-6">
           {member.children.map((child: Child, idx: number) => (
             <li key={idx} className="mb-2">
-              <p><strong>Name:</strong> {child.name}</p>
-              <p><strong>Gender:</strong> {child.gender}</p>
-              <p><strong>DOB:</strong> {formatDate(child.birthDate)}</p>
+              <p>
+                <strong>Name:</strong> {child.name}
+              </p>
+              <p>
+                <strong>Gender:</strong> {child.gender}
+              </p>
+              <p>
+                <strong>DOB:</strong> {formatDate(child.birthDate)}
+              </p>
             </li>
           ))}
         </ul>
@@ -134,7 +168,7 @@ export default function MemberProfile(): JSX.Element {
             </tr>
           </thead>
           <tbody>
-            {payments.map(p => {
+            {payments.map((p) => {
               const [yr, mo, da] = p.paymentDate.split("-");
               return (
                 <tr key={p.id}>

@@ -1,246 +1,524 @@
+// // src/pages/TransactionDetail.tsx
+// import React, { useEffect, useState } from "react";
+// import { useNavigate, useParams, Link } from "react-router-dom";
+// import api from "../api/api";
 
-import { useEffect, useMemo, useState } from "react";
-import { format, parseISO, isValid as isValidDate } from "date-fns";
-import { useNavigate } from "react-router-dom";
-import api from "../api/api"; // adjust to "../../api/api" if needed
+// type FinanceRecord = {
+//   id: number;
+//   date: string;
+//   income: number | null;
+//   expense: number | null;
+//   description: string;
+// };
 
-type FinanceRecord = {
+// const TransactionDetail: React.FC = () => {
+//   const { id } = useParams<{ id: string }>();
+//   const navigate = useNavigate();
+//   const [record, setRecord] = useState<FinanceRecord | null>(null);
+//   const [loading, setLoading] = useState(true);
+//   const [err, setErr] = useState<string>("");
+
+//   useEffect(() => {
+//     if (!id) return;
+//     const run = async () => {
+//       setLoading(true);
+//       setErr("");
+//       try {
+//         // IMPORTANT: use the shared axios instance that attaches the token
+//         const { data } = await api.get<FinanceRecord>(`/transactions/${id}`);
+//         setRecord(data);
+//       } catch (e: any) {
+//         const status = e?.response?.status;
+//         if (status === 401) setErr("Unauthorized. Please sign in again.");
+//         else if (status === 403) setErr("Forbidden. You don't have access to this transaction.");
+//         else setErr(e?.response?.data?.message ?? "Failed to load transaction.");
+//       } finally {
+//         setLoading(false);
+//       }
+//     };
+//     run();
+//   }, [id]);
+
+//   if (loading) return <div className="p-6 text-center">Loading transaction…</div>;
+
+//   if (err) {
+//     return (
+//       <div className="p-6 max-w-xl mx-auto">
+//         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+//           {err}
+//         </div>
+//         <div className="mt-4">
+//           <button
+//             onClick={() => navigate(-1)}
+//             className="px-4 py-2 rounded-md border hover:bg-gray-50"
+//           >
+//             ← Back
+//           </button>
+//         </div>
+//       </div>
+//     );
+//   }
+
+//   if (!record) return null;
+
+//   const income = Number(record.income ?? 0).toFixed(2);
+//   const expense = Number(record.expense ?? 0).toFixed(2);
+
+//   return (
+//     <div className="p-6 max-w-3xl mx-auto space-y-4">
+//       <div>
+//         <Link to="/finance" className="text-blue-600 hover:underline">← Back to Finance</Link>
+//       </div>
+
+//       <h1 className="text-2xl font-bold">Transaction #{record.id}</h1>
+
+//       <div className="rounded-xl bg-white border p-4 shadow">
+//         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+//           <div>
+//             <dt className="text-gray-500 text-sm">Date</dt>
+//             <dd className="font-medium">{new Date(record.date).toLocaleDateString()}</dd>
+//           </div>
+//           <div>
+//             <dt className="text-gray-500 text-sm">Income</dt>
+//             <dd className="font-medium text-green-700">${income}</dd>
+//           </div>
+//           <div>
+//             <dt className="text-gray-500 text-sm">Expense</dt>
+//             <dd className="font-medium text-red-700">${expense}</dd>
+//           </div>
+//           <div className="sm:col-span-2">
+//             <dt className="text-gray-500 text-sm">Description</dt>
+//             <dd className="font-medium">{record.description || "—"}</dd>
+//           </div>
+//         </dl>
+//       </div>
+//     </div>
+//   );
+// };
+
+// export default TransactionDetail;
+// src/pages/TransactionDetail.tsx
+// src/pages/TransactionDetail.tsx
+// src/pages/TransactionDetail.tsx
+
+
+// src/pages/TransactionDetail.tsx
+// src/pages/TransactionDetail.tsx
+// src/pages/Finance.tsx
+// src/pages/Finance.tsx
+// src/pages/Finance.tsx
+// src/pages/Finance.tsx
+// src/pages/Finance.tsx
+// src/pages/Finance.tsx
+// src/pages/Finance.tsx
+// src/pages/Finance.tsx
+// src/pages/Finance.tsx
+// src/pages/Finance.tsx
+import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import api from "../api/api";
+
+const API_PATH = "/transactions";
+
+type Tx = {
   id: number;
-  date: string;         // ISO date, e.g. "2025-08-01"
+  date: string;
   income: number | null;
   expense: number | null;
   description: string;
+  personInvolved?: string | null;
 };
 
-type Period = "Monthly" | "Quarterly" | "Yearly" | "Custom";
+type Period = "monthly" | "quarterly" | "yearly" | "custom";
 
-const Finance = () => {
-  const [records, setRecords] = useState<FinanceRecord[]>([]);
-  const [period, setPeriod] = useState<Period>("Monthly");
-  const [fromDate, setFromDate] = useState<string>("");
-  const [toDate, setToDate] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+// helpers
+const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+const toDate = (s: string) => {
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+};
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+const endOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+const quarterForMonth = (m: number) => Math.floor(m / 3) + 1;
+const quarterStartMonth = (q: number) => (Math.max(1, Math.min(4, q)) - 1) * 3;
+const fmtRange = (s: Date, e: Date) => `${s.toLocaleDateString()} – ${e.toLocaleDateString()}`;
 
-  const navigate = useNavigate();
-  const today = new Date();
+const Finance: React.FC = () => {
+  const [items, setItems] = useState<Tx[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  const now = new Date();
+  const [period, setPeriod] = useState<Period>("monthly");
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [quarter, setQuarter] = useState(quarterForMonth(now.getMonth()));
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
 
   useEffect(() => {
-    const fetchTransactions = async () => {
+    const load = async () => {
       setLoading(true);
+      setErr("");
       try {
-        const res = await api.get<FinanceRecord[]>("/transactions");
-        setRecords(Array.isArray(res.data) ? res.data : []);
-        setError(null);
+        const { data } = await api.get<Tx[]>(API_PATH);
+        const list = Array.isArray(data) ? data : [];
+        const sorted = [...list].sort((a, b) => {
+          const ta = Date.parse(a.date || "");
+          const tb = Date.parse(b.date || "");
+          if (isNaN(ta) && isNaN(tb)) return 0;
+          if (isNaN(ta)) return 1;
+          if (isNaN(tb)) return -1;
+          return tb - ta;
+        });
+        setItems(sorted);
       } catch (e: any) {
-        setError(
-          e?.response?.status === 403
-            ? "You are not authorized to view financial records."
-            : "Failed to load financial records."
+        const s = e?.response?.status;
+        setErr(
+          s === 401
+            ? "Unauthorized. Please sign in again."
+            : s === 403
+            ? "Forbidden. You don't have access to Finance."
+            : e?.response?.data?.message ?? "Failed to load transactions."
         );
       } finally {
         setLoading(false);
       }
     };
-    fetchTransactions();
+    load();
   }, []);
 
-  const customInvalid =
-    period === "Custom" &&
-    !!fromDate &&
-    !!toDate &&
-    new Date(fromDate).getTime() > new Date(toDate).getTime();
+  const [rangeStart, rangeEnd] = useMemo<[Date | null, Date | null]>(() => {
+    if (period === "yearly") {
+      const s = new Date(year, 0, 1);
+      const e = new Date(year, 11, 31);
+      return [startOfDay(s), endOfDay(e)];
+    }
+    if (period === "quarterly") {
+      const m0 = quarterStartMonth(quarter);
+      const s = new Date(year, m0, 1);
+      const e = new Date(year, m0 + 3, 0);
+      return [startOfDay(s), endOfDay(e)];
+    }
+    if (period === "monthly") {
+      const m = clamp(month, 1, 12) - 1;
+      const s = new Date(year, m, 1);
+      const e = new Date(year, m + 1, 0);
+      return [startOfDay(s), endOfDay(e)];
+    }
+    const s = customStart ? toDate(customStart) : null;
+    const e = customEnd ? toDate(customEnd) : null;
+    return [s ? startOfDay(s) : null, e ? endOfDay(e) : null];
+  }, [period, year, month, quarter, customStart, customEnd]);
 
-  // Filter + sort once, memoized
   const filtered = useMemo(() => {
-    if (!records.length) return [];
-
-    const sorted = [...records].sort((a, b) => {
-      const da = parseISO(a.date);
-      const db = parseISO(b.date);
-      return da.getTime() - db.getTime();
+    if (!rangeStart && !rangeEnd) return items;
+    return items.filter((tx) => {
+      const d = toDate(tx.date);
+      if (!d) return false;
+      const t = d.getTime();
+      if (rangeStart && t < rangeStart.getTime()) return false;
+      if (rangeEnd && t > rangeEnd.getTime()) return false;
+      return true;
     });
+  }, [items, rangeStart, rangeEnd]);
 
-    return sorted.filter((r) => {
-      const d = parseISO(r.date);
-      if (!isValidDate(d)) return false;
-
-      if (period === "Monthly") {
-        return (
-          d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear()
-        );
-      }
-      if (period === "Quarterly") {
-        const qToday = Math.floor(today.getMonth() / 3);
-        const qRec = Math.floor(d.getMonth() / 3);
-        return qRec === qToday && d.getFullYear() === today.getFullYear();
-      }
-      if (period === "Yearly") {
-        return d.getFullYear() === today.getFullYear();
-      }
-      if (period === "Custom" && !customInvalid && fromDate && toDate) {
-        const start = parseISO(fromDate);
-        const end = parseISO(toDate);
-        if (!isValidDate(start) || !isValidDate(end)) return false;
-        return d >= start && d <= end;
-      }
-      return false;
-    });
-  }, [records, period, fromDate, toDate, today, customInvalid]);
-
-  const { totalIncome, totalExpense, withBalance } = useMemo(() => {
-    let running = 0;
-    let inc = 0;
-    let exp = 0;
-
-    const rows = filtered.map((r) => {
-      const income = Number(r.income ?? 0);
-      const expense = Number(r.expense ?? 0);
-      running += income - expense;
-      inc += income;
-      exp += expense;
-      return { ...r, _balance: running, _income: income, _expense: expense };
-    });
-
-    return { totalIncome: inc, totalExpense: exp, withBalance: rows };
+  const totals = useMemo(() => {
+    const income = filtered.reduce((s, t) => s + Number(t.income ?? 0), 0);
+    const expense = filtered.reduce((s, t) => s + Number(t.expense ?? 0), 0);
+    const balance = income - expense;
+    return {
+      income: income.toFixed(2),
+      expense: expense.toFixed(2),
+      balance: balance.toFixed(2),
+    };
   }, [filtered]);
 
-  const netBalance = totalIncome - totalExpense;
+  const shiftPeriod = (dir: -1 | 1) => {
+    if (period === "yearly") {
+      setYear((y) => y + dir);
+    } else if (period === "quarterly") {
+      setQuarter((q) => {
+        const nextQ = q + dir;
+        if (nextQ < 1) {
+          setYear((y) => y - 1);
+          return 4;
+        }
+        if (nextQ > 4) {
+          setYear((y) => y + 1);
+          return 1;
+        }
+        return nextQ;
+      });
+    } else if (period === "monthly") {
+      setMonth((m) => {
+        const nextM = m + dir;
+        if (nextM < 1) {
+          setYear((y) => y - 1);
+          return 12;
+        }
+        if (nextM > 12) {
+          setYear((y) => y + 1);
+          return 1;
+        }
+        return nextM;
+      });
+    }
+  };
 
-  if (loading) return <div className="p-6 text-center">Loading records...</div>;
-  if (error) return <div className="p-6 text-red-600 text-center">{error}</div>;
+  const clearFilters = () => {
+    const n = new Date();
+    setPeriod("monthly");
+    setYear(n.getFullYear());
+    setMonth(n.getMonth() + 1);
+    setQuarter(quarterForMonth(n.getMonth()));
+    setCustomStart("");
+    setCustomEnd("");
+  };
+
+  const rangeLabel = useMemo(() => {
+    if (period === "yearly") return `${year}`;
+    if (period === "quarterly") return `Q${quarter} ${year}`;
+    if (period === "monthly")
+      return `${new Date(year, month - 1, 1).toLocaleString(undefined, {
+        month: "long",
+        year: "numeric",
+      })}`;
+    if (rangeStart && rangeEnd) return fmtRange(rangeStart, rangeEnd);
+    if (rangeStart) return `From ${rangeStart.toLocaleDateString()}`;
+    if (rangeEnd) return `Until ${rangeEnd.toLocaleDateString()}`;
+    return "All time";
+  }, [period, year, month, quarter, rangeStart, rangeEnd]);
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <h1 className="text-3xl font-bold text-gray-800">Finance Dashboard</h1>
-        <button
-          onClick={() => navigate("/finance/add")}
-          className="bg-green-600 text-white px-6 py-2 rounded-md shadow hover:bg-green-700 transition"
-        >
-          + New Transaction
-        </button>
-      </div>
-
-      <div className="flex flex-wrap gap-4 items-end">
-        <div>
-          <label className="block text-sm font-medium text-gray-600">Filter by</label>
-          <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value as Period)}
-            className="border p-2 rounded w-full"
-          >
-            <option value="Monthly">Monthly</option>
-            <option value="Quarterly">Quarterly</option>
-            <option value="Yearly">Yearly</option>
-            <option value="Custom">Custom</option>
-          </select>
+    <>
+      {/* Page */}
+      <div className="p-4 sm:p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl sm:text-2xl font-bold">Finance</h1>
+          <div className="flex gap-2">
+            <Link to="/finance/add" className="px-3 sm:px-4 py-2 rounded-md border hover:bg-gray-50">
+              + Add Transaction
+            </Link>
+          </div>
         </div>
 
-        {period === "Custom" && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-600">From</label>
+        {/* Reporting Controls */}
+        <div className="rounded-xl border bg-white p-3 sm:p-4 shadow space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="text-sm font-medium">Report:</label>
+            <select
+              className="border rounded px-2 py-1"
+              value={period}
+              onChange={(e) => setPeriod(e.target.value as Period)}
+            >
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="yearly">Yearly</option>
+              <option value="custom">Custom</option>
+            </select>
+
+            {period === "yearly" && (
               <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="border p-2 rounded w-full"
+                type="number"
+                className="border rounded px-2 py-1 w-24 sm:w-28"
+                value={year}
+                onChange={(e) => setYear(Number(e.target.value || new Date().getFullYear()))}
               />
+            )}
+
+            {period === "quarterly" && (
+              <>
+                <select
+                  className="border rounded px-2 py-1"
+                  value={quarter}
+                  onChange={(e) => setQuarter(Number(e.target.value))}
+                >
+                  <option value={1}>Q1</option>
+                  <option value={2}>Q2</option>
+                  <option value={3}>Q3</option>
+                  <option value={4}>Q4</option>
+                </select>
+                <input
+                  type="number"
+                  className="border rounded px-2 py-1 w-24 sm:w-28"
+                  value={year}
+                  onChange={(e) => setYear(Number(e.target.value || new Date().getFullYear()))}
+                />
+              </>
+            )}
+
+            {period === "monthly" && (
+              <>
+                <select
+                  className="border rounded px-2 py-1"
+                  value={month}
+                  onChange={(e) => setMonth(Number(e.target.value))}
+                >
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {new Date(0, i, 1).toLocaleString(undefined, { month: "long" })}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  className="border rounded px-2 py-1 w-24 sm:w-28"
+                  value={year}
+                  onChange={(e) => setYear(Number(e.target.value || new Date().getFullYear()))}
+                />
+              </>
+            )}
+
+            {period === "custom" && (
+              <>
+                <label className="text-sm">From</label>
+                <input
+                  type="date"
+                  className="border rounded px-2 py-1"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                />
+                <label className="text-sm">To</label>
+                <input
+                  type="date"
+                  className="border rounded px-2 py-1"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                />
+              </>
+            )}
+
+            <button
+              className="ml-auto px-3 py-1 rounded border hover:bg-gray-50"
+              onClick={clearFilters}
+              type="button"
+            >
+              Reset
+            </button>
+          </div>
+
+          {/* Period nav + label */}
+          {period !== "custom" ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => shiftPeriod(-1)}
+                className="px-3 py-1 rounded border hover:bg-gray-50"
+                type="button"
+              >
+                ← Prev
+              </button>
+              <div className="text-sm text-gray-700 font-medium">{rangeLabel}</div>
+              <button
+                onClick={() => shiftPeriod(1)}
+                className="px-3 py-1 rounded border hover:bg-gray-50"
+                type="button"
+              >
+                Next →
+              </button>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-600">To</label>
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="border p-2 rounded w-full"
-              />
-            </div>
-          </>
+          ) : (
+            <div className="text-sm text-gray-700 font-medium">{rangeLabel}</div>
+          )}
+        </div>
+
+        {/* Status */}
+        {loading && <div>Loading transactions…</div>}
+        {!!err && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+            {err}
+          </div>
         )}
-      </div>
 
-      {customInvalid && (
-        <p className="text-red-500 font-medium">
-          “From” date must be before or same as “To” date.
-        </p>
-      )}
-
-      {!customInvalid && (
-        <>
-          <div className="overflow-x-auto border rounded-lg shadow bg-white">
-            <table className="min-w-full table-auto text-sm">
-              <thead className="bg-gray-100 text-gray-700">
+        {/* Table (filtered) */}
+        {!loading && !err && (
+          <div className="rounded-xl border bg-white shadow overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
                 <tr>
-                  <th className="p-3 text-left">Date</th>
-                  <th className="p-3 text-right">Income</th>
-                  <th className="p-3 text-right">Expense</th>
-                  <th className="p-3 text-left">Description</th>
-                  <th className="p-3 text-right">Balance</th>
-                  <th className="p-3"></th>
+                  <th className="text-left p-3 font-medium text-gray-600">Date</th>
+                  <th className="text-left p-3 font-medium text-gray-600">Description</th>
+                  <th className="text-right p-3 font-medium text-gray-600">Income</th>
+                  <th className="text-right p-3 font-medium text-gray-600">Expense</th>
+                  <th className="text-right p-3 font-medium text-gray-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {withBalance.map((r) => (
-                  <tr key={r.id} className="border-t hover:bg-gray-50">
-                    <td className="p-3">
-                      {isValidDate(parseISO(r.date))
-                        ? format(parseISO(r.date), "yyyy-MM-dd")
-                        : r.date}
-                    </td>
-                    <td className="p-3 text-right text-green-600 font-semibold">
-                      ${r._income.toFixed(2)}
-                    </td>
-                    <td className="p-3 text-right text-red-600 font-semibold">
-                      ${r._expense.toFixed(2)}
-                    </td>
-                    <td className="p-3">{r.description}</td>
-                    <td className="p-3 text-right">
-                      ${r._balance.toFixed(2)}
-                    </td>
-                    <td className="p-3 text-right">
-                      <button
-                        onClick={() => navigate(`/finance/${r.id}`)}
-                        className="text-blue-600 hover:underline text-sm"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-
-                {withBalance.length === 0 && (
+                {filtered.length === 0 ? (
                   <tr>
-                    <td className="p-4 text-center text-gray-500" colSpan={6}>
-                      No transactions for the selected period.
+                    <td colSpan={5} className="p-4 text-center text-gray-500">
+                      No transactions for this range.
                     </td>
                   </tr>
+                ) : (
+                  filtered.map((tx) => {
+                    const d = toDate(tx.date);
+                    const date = d ? d.toLocaleDateString() : tx.date;
+                    const inc = Number(tx.income ?? 0).toFixed(2);
+                    const exp = Number(tx.expense ?? 0).toFixed(2);
+                    return (
+                      <tr key={tx.id} className="border-t hover:bg-gray-50">
+                        <td className="p-3">{date}</td>
+                        <td className="p-3">{tx.description || "—"}</td>
+                        <td className="p-3 text-right text-green-700">${inc}</td>
+                        <td className="p-3 text-right text-red-700">${exp}</td>
+                        <td className="p-3 text-right">
+                          <Link
+                            to={`/finance/${tx.id}`}
+                            className="text-blue-600 hover:underline mr-3"
+                          >
+                            View
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
+        )}
 
-          <div className="w-full max-w-md bg-gray-100 rounded-lg shadow p-4 mt-6">
-            <h3 className="text-lg font-semibold mb-2">
-              Summary ({period}
-              {period === "Custom" && fromDate && toDate ? `: ${fromDate} → ${toDate}` : ""})
-            </h3>
-            <div className="space-y-1 text-sm">
-              <p>
-                <strong>Total Income:</strong> ${totalIncome.toFixed(2)}
-              </p>
-              <p>
-                <strong>Total Expense:</strong> ${totalExpense.toFixed(2)}
-              </p>
-              <p>
-                <strong>Net Balance:</strong> ${netBalance.toFixed(2)}
-              </p>
+        {/* Responsive spacer to reserve footer space (match footer height) */}
+        <div className="h-24 lg:h-28" aria-hidden />
+      </div>
+
+      {/* Fixed Totals Footer — responsive, centered on mobile, aligned on desktop */}
+      <div className="fixed bottom-0 left-0 right-0 h-24 lg:h-28 border-t bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/60 shadow-md z-50 lg:pl-64">
+        <div className="mx-auto max-w-6xl h-full px-4 sm:px-6">
+          <div className="flex h-full flex-wrap items-center justify-center gap-x-6 gap-y-2 lg:justify-end">
+            <div className="w-full text-center lg:w-auto lg:text-left text-sm sm:text-base text-gray-600">
+              Range: <span className="font-semibold text-gray-800">{rangeLabel}</span>
+            </div>
+
+            <div className="hidden lg:block ml-auto" />
+
+            <div className="text-sm sm:text-base font-medium">
+              Income:{" "}
+              <span className="align-middle text-xl sm:text-2xl font-semibold text-green-700">
+                ${totals.income}
+              </span>
+            </div>
+            <div className="text-sm sm:text-base font-medium">
+              Expense:{" "}
+              <span className="align-middle text-xl sm:text-2xl font-semibold text-red-700">
+                ${totals.expense}
+              </span>
+            </div>
+            <div className="text-sm sm:text-base font-semibold">
+              Balance:{" "}
+              <span className="align-middle text-2xl sm:text-3xl font-bold text-gray-900">
+                ${totals.balance}
+              </span>
             </div>
           </div>
-        </>
-      )}
-    </div>
+        </div>
+
+        {/* iOS safe area padding for notches/home bar */}
+        <div className="pointer-events-none" style={{ paddingBottom: "env(safe-area-inset-bottom)" }} />
+      </div>
+    </>
   );
 };
 

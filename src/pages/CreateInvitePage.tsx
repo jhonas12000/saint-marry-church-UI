@@ -7,7 +7,7 @@ import { useAuth } from "../auth/AuthProvider";
 export type CommitteeRole =
   | "ADMIN"
   | "MEMBER"
-  | "CHAIRMAN"
+  | "CHAIRPERSON"
   | "FINANCE_MANAGER"
   | "EDUCATION_LEAD"
   | "SECRETARY";
@@ -33,13 +33,13 @@ const ROLES: CommitteeRole[] = [
   "FINANCE_MANAGER",
   "EDUCATION_LEAD",
   "SECRETARY",
-  "CHAIRMAN",
+  "CHAIRPERSON",
   "ADMIN",
 ];
 
 export default function CreateInvitePage() {
   const nav = useNavigate();
-  const { token, user } = useAuth();
+  const {token, user } = useAuth();
 
   const [form, setForm] = useState<CreateInviteRequest>({
     email: "",

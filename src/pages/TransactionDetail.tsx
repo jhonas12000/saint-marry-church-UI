@@ -1,15 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { format, parseISO } from 'date-fns';
+// src/pages/TransactionDetail.tsx
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { format, parseISO, isValid as isValidDate } from "date-fns";
+import api from "../api/api"; // <-- use shared client (adds Authorization)
 
 type FinanceRecord = {
   id: number;
   date: string;
-  income: number;
-  expense: number;
+  income: number | null;
+  expense: number | null;
   description: string;
-  personInvolved: string;  // new field for payer/receiver
+  personInvolved?: string;
 };
 
 const TransactionDetail: React.FC = () => {
@@ -19,64 +20,101 @@ const TransactionDetail: React.FC = () => {
   const [record, setRecord] = useState<FinanceRecord | null>(null);
   const [formData, setFormData] = useState<FinanceRecord | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
   const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
+  if (!id) {
+    console.log("TransactionDetail useEffect, id =", id);
+    setLoading(false);
+    navigate("/finance", { replace: true });
+    return;
+  }
+
+  (async () => {
     setLoading(true);
-    axios.get<FinanceRecord>(`http://localhost:8080/api/transactions/${id}`)
-      .then(res => {
-        setRecord(res.data);
-        setFormData(res.data);
-        setError('');
-      })
-      .catch(() => setError('Transaction not found.'))
-      .finally(() => setLoading(false));
-  }, [id]);
+    setError("");
+    try {
+      const { data } = await api.get<FinanceRecord>(`/transactions/${id}`);
+      setRecord(data);
+      setFormData(data);
+    } catch (e: any) {
+      const s = e?.response?.status;
+      setError(
+        s === 401
+          ? "Unauthorized. Please sign in again."
+          : s === 403
+          ? "Forbidden. You don’t have access to this transaction."
+          : "Transaction not found."
+      );
+    } finally {
+      setLoading(false);
+    }
+  })();
+}, [id, navigate]);
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!formData) return;
     const { name, value } = e.target;
     setFormData({
       ...formData,
-      [name]: name === 'income' || name === 'expense'
-        ? parseFloat(value) || 0
-        : value,
-    });
+      [name]:
+        name === "income" || name === "expense"
+          ? (value === "" ? null : Number(value))
+          : value,
+    } as FinanceRecord);
   };
 
   const handleSave = async () => {
     if (!formData) return;
     try {
-      const res = await axios.put<FinanceRecord>(
-        `http://localhost:8080/api/transactions/${formData.id}`,
+      const { data } = await api.put<FinanceRecord>(
+        `/transactions/${formData.id}`,
         formData
       );
-      setRecord(res.data);
+      setRecord(data);
+      setFormData(data);
       setEditMode(false);
-      alert('Transaction updated successfully!');
-    } catch (err) {
-      console.error(err);
-      alert('Failed to update transaction.');
+      alert("Transaction updated successfully!");
+    } catch (err: any) {
+      const status = err?.response?.status;
+      alert(
+        status === 401
+          ? "Unauthorized. Please sign in again."
+          : status === 403
+          ? "Forbidden."
+          : "Failed to update transaction."
+      );
     }
   };
 
   const handleDelete = async () => {
     if (!record) return;
-    if (!window.confirm('Are you sure you want to delete this transaction?')) return;
+    if (!window.confirm("Are you sure you want to delete this transaction?")) return;
     try {
-      await axios.delete(`http://localhost:8080/api/transactions/${record.id}`);
-      alert('Transaction deleted.');
-      navigate('/finance');
-    } catch (err) {
-      console.error(err);
-      alert('Failed to delete transaction.');
+      await api.delete(`/transactions/${record.id}`);
+      alert("Transaction deleted.");
+      navigate("/finance");
+    } catch (err: any) {
+      const status = err?.response?.status;
+      alert(
+        status === 401
+          ? "Unauthorized. Please sign in again."
+          : status === 403
+          ? "Forbidden."
+          : "Failed to delete transaction."
+      );
     }
   };
 
   if (loading) return <div className="p-6">Loading...</div>;
-  if (error || !record) return <div className="p-6 text-red-600">{error || 'Not found'}</div>;
+  if (error || !record) return <div className="p-6 text-red-600">{error || "Not found"}</div>;
+
+  const parsed = parseISO(record.date);
+  const dateOut = isValidDate(parsed) ? format(parsed, "yyyy-MM-dd") : record.date;
+  const income = Number(record.income ?? 0).toFixed(2);
+  const expense = Number(record.expense ?? 0).toFixed(2);
 
   return (
     <div className="p-6 max-w-md mx-auto bg-white rounded shadow">
@@ -84,11 +122,11 @@ const TransactionDetail: React.FC = () => {
 
       {!editMode && (
         <div className="space-y-2">
-          <p><strong>Date:</strong> {format(parseISO(record.date), 'yyyy-MM-dd')}</p>
-          <p><strong>Income:</strong> ${record.income}</p>
-          <p><strong>Expense:</strong> ${record.expense}</p>
+          <p><strong>Date:</strong> {dateOut}</p>
+          <p><strong>Income:</strong> ${income}</p>
+          <p><strong>Expense:</strong> ${expense}</p>
           <p><strong>Description:</strong> {record.description}</p>
-          <p><strong>Person Involved (Payer/Receiver):</strong> {record.personInvolved}</p>
+          <p><strong>Person Involved (Payer/Receiver):</strong> {record.personInvolved || "—"}</p>
           <div className="mt-4 flex gap-2">
             <button
               type="button"
@@ -132,9 +170,10 @@ const TransactionDetail: React.FC = () => {
             <input
               type="number"
               name="income"
-              value={formData.income}
+              value={formData.income ?? ""}
               onChange={handleChange}
               className="w-full border p-2 rounded"
+              step="0.01"
             />
           </div>
           <div>
@@ -142,9 +181,10 @@ const TransactionDetail: React.FC = () => {
             <input
               type="number"
               name="expense"
-              value={formData.expense}
+              value={formData.expense ?? ""}
               onChange={handleChange}
               className="w-full border p-2 rounded"
+              step="0.01"
             />
           </div>
           <div>
@@ -162,7 +202,7 @@ const TransactionDetail: React.FC = () => {
             <input
               type="text"
               name="personInvolved"
-              value={formData.personInvolved}
+              value={formData.personInvolved ?? ""}
               onChange={handleChange}
               className="w-full border p-2 rounded"
             />
