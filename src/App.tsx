@@ -1,7 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./auth/AuthProvider";
-
-// Pages & components
 import Committee from "./pages/Committee";
 import Members from "./pages/Members";
 import Education from "./pages/Education";
@@ -31,6 +29,8 @@ import PizzaContributionEditPage from "./pages/PizzaContributionEditPage";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import CommitteeProfilePage from "./pages/CommitteeProfilePage";
+import Dashboard from "./pages/Dashboard";
+
 
 // 🔹 Use the new Layout with hamburger + drawer
 import AppLayout from "./layout/Layout";
@@ -62,15 +62,23 @@ function App() {
       <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Root → Members by default when authenticated */}
+
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <AppLayout title="Dashboard">
+              <Dashboard />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/"
         element={
           isAuthenticated ? (
-            <ProtectedRoute>
-              <AppLayout title="Members">
-                <Members />
-              </AppLayout>
-            </ProtectedRoute>
+            <Navigate to="/dashboard" replace />
           ) : (
             <Welcome />
           )

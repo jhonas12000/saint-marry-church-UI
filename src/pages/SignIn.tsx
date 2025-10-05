@@ -1,10 +1,12 @@
-
+// src/pages/SignIn.tsx
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import api from "../api/api";
 import { useAuth } from "../auth/AuthProvider";
 import type { AuthResponse } from "../auth/types";
-import { Eye, EyeOff } from "lucide-react"; // 👈 add this
+import { Eye, EyeOff } from "lucide-react";
+
+const DEFAULT_AFTER_LOGIN = "/dashboard";
 
 const SignIn: React.FC = () => {
   const { signin } = useAuth();
@@ -14,7 +16,7 @@ const SignIn: React.FC = () => {
   const [form, setForm] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
-  const [showPassword, setShowPassword] = useState(false); // 👈 add this
+  const [showPassword, setShowPassword] = useState(false);
 
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -29,6 +31,7 @@ const SignIn: React.FC = () => {
         password: form.password,
       });
 
+      // Extract token from common places
       let token =
         (res.data as any)?.token ||
         (res.data as any)?.jwt ||
@@ -44,12 +47,16 @@ const SignIn: React.FC = () => {
       if (token.startsWith("Bearer ")) token = token.slice(7);
 
       localStorage.setItem("token", token);
-      console.log("Saved token:", token.slice(0, 24) + "...");
-
       signin(res.data);
 
-      const to = (location.state as any)?.from?.pathname || "/";
-      navigate(to, { replace: true });
+      // Prefer where the user tried to go, but fall back to /dashboard (not "/")
+      const from = (location.state as any)?.from?.pathname as string | undefined;
+      const goTo =
+        from && from !== "/signin" && !from.startsWith("/invite")
+          ? from
+          : DEFAULT_AFTER_LOGIN;
+
+      navigate(goTo, { replace: true });
     } catch (e: any) {
       const status = e?.response?.status;
       const msg =
@@ -92,13 +99,13 @@ const SignIn: React.FC = () => {
 
           <div>
             <label className="block text-sm text-gray-700 mb-1">Password</label>
-            <div className="relative"> 
+            <div className="relative">
               <input
-                type={showPassword ? "text" : "password"}   
+                type={showPassword ? "text" : "password"}
                 name="password"
                 value={form.password}
                 onChange={onChange}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500" // 👈 add pr-10
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="••••••••"
                 autoComplete="current-password"
                 required
@@ -109,7 +116,7 @@ const SignIn: React.FC = () => {
                 onClick={() => setShowPassword((s) => !s)}
                 aria-label={showPassword ? "Hide password" : "Show password"}
                 className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-500 hover:text-gray-700"
-                tabIndex={-1} // keep tab order on the input; remove if you want it focusable
+                tabIndex={-1}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -139,4 +146,3 @@ const SignIn: React.FC = () => {
 };
 
 export default SignIn;
-

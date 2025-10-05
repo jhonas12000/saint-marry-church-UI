@@ -140,7 +140,7 @@ try {
 
   console.log("AddMember payload:", payload);
 
-  const res = await api.post("/church-members/register", payload, {
+  await api.post("/church-members/register", payload, {
     headers: raw ? { Authorization: `Bearer ${raw}` } : {},
   });
 

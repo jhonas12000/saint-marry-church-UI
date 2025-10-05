@@ -1,15 +1,30 @@
+// src/api/api.ts
 import axios from "axios";
 import { getToken, signOutAndRedirect } from "../auth/storage.tsx";
 
-// Local dev baseURL already includes /api
+/**
+ * Resolve API base from env:
+ *  - Dev:    VITE_API_BASE=http://localhost:8080
+ *  - Prod:   VITE_API_BASE=http://44.248.238.243   (or your domain)
+ *
+ * We append `/api` once here, so elsewhere you call api.get("/auth/signin"), etc.
+ */
+function resolveBaseURL() {
+  const raw = import.meta.env.VITE_API_BASE ?? "http://localhost:8080";
+  // remove trailing slash if present
+  const base = raw.replace(/\/+$/, "");
+  return `${base}/api`;
+}
+
+// Create axios instance
 const api = axios.create({
-  baseURL: "http://localhost:8080/api",
-  withCredentials: false,
+  baseURL: resolveBaseURL(),
+  withCredentials: false, // using Authorization header, not cookies
 });
 
-// Public auth endpoints — never send Authorization and never auto-redirect on 401
+// Endpoints that must remain public (no Authorization, no auto-redirect on 401)
 const isPublicAuthFlow = (url: string) => {
-  // NOTE: url here is the request path relative to baseURL, e.g. "/auth/validate-invite"
+  // url is relative to baseURL, e.g. "/auth/signin"
   return (
     url.includes("/auth/signin") ||
     url.includes("/auth/validate-invite") ||
@@ -19,11 +34,11 @@ const isPublicAuthFlow = (url: string) => {
   );
 };
 
-// Attach token except on public auth flows
+// Attach Authorization header for non-public routes
 api.interceptors.request.use((config) => {
   config.headers = config.headers ?? {};
-  const token = getToken();
   const reqUrl = (config.url || "").toString();
+  const token = getToken();
 
   if (isPublicAuthFlow(reqUrl)) {
     delete (config.headers as any).Authorization;
@@ -35,7 +50,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Only redirect to /signin on 401 for NON-public endpoints
+// On 401 from protected routes, sign out and bounce to /signin
 api.interceptors.response.use(
   (res) => res,
   (err) => {
@@ -44,7 +59,8 @@ api.interceptors.response.use(
 
     if (status === 401 && !isPublicAuthFlow(url)) {
       signOutAndRedirect();
-      return new Promise(() => {}); // stop further handling after redirect
+      // Return a pending promise to halt caller chains after redirect
+      return new Promise(() => {});
     }
     return Promise.reject(err);
   }
