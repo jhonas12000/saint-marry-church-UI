@@ -49,7 +49,7 @@
 // export default Education;
 
 import React from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Wrench, Clock } from "lucide-react";
 
 const Education: React.FC = () => {
