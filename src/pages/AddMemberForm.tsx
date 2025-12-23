@@ -67,29 +67,37 @@ const AddMemberForm: React.FC = () => {
   };
 
   // Simple validation
+  // const validateForm = () => {
+  //   const newErrors: Record<string, string> = {};
+  //   if (!formData.firstName) newErrors.firstName = "First Name is required.";
+  //   if (!formData.lastName)  newErrors.lastName  = "Last Name is required.";
+  //   if (!formData.telephone) newErrors.telephone = "Telephone is required.";
+  //   if (!formData.email)     newErrors.email     = "Email is required.";
+  //   else if (!/\S+@\S+\.\S+/.test(formData.email))
+  //     newErrors.email = "Email is invalid.";
+  //   if (!formData.address)   newErrors.address   = "Address is required.";
+
+  //   formData.children.forEach((child, idx) => {
+  //     if (!child.name)      newErrors[`childName${idx}`]      = "Name is required.";
+  //     if (!child.birthDate) newErrors[`childBirthDate${idx}`] = "Birthdate is required.";
+  //     if (!child.gender)    newErrors[`childGender${idx}`]    = "Gender is required.";
+  //   });
+
+  //   if (!formData.memberSince) {
+  //     newErrors.memberSince = "Required";
+  //   }
+
+  //   setErrors(newErrors);
+  //   return Object.keys(newErrors).length === 0;
+  // };
+
+  // 🔓 Simple validation DISABLED – always returns true
   const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-    if (!formData.firstName) newErrors.firstName = "First Name is required.";
-    if (!formData.lastName)  newErrors.lastName  = "Last Name is required.";
-    if (!formData.telephone) newErrors.telephone = "Telephone is required.";
-    if (!formData.email)     newErrors.email     = "Email is required.";
-    else if (!/\S+@\S+\.\S+/.test(formData.email))
-      newErrors.email = "Email is invalid.";
-    if (!formData.address)   newErrors.address   = "Address is required.";
-
-    formData.children.forEach((child, idx) => {
-      if (!child.name)      newErrors[`childName${idx}`]      = "Name is required.";
-      if (!child.birthDate) newErrors[`childBirthDate${idx}`] = "Birthdate is required.";
-      if (!child.gender)    newErrors[`childGender${idx}`]    = "Gender is required.";
-    });
-
-    if (!formData.memberSince) {
-      newErrors.memberSince = "Required";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    // clear any existing errors
+    setErrors({});
+    return true;
   };
+
 
   // Submit
   const handleSubmit = async (e: React.FormEvent) => {

@@ -124,12 +124,18 @@ const Members: React.FC = () => {
             Table View
           </button>
 
-          <button
-            onClick={() => navigate("/members/finance-officer")}
-            className="flex-1 basis-1/3 min-w-0 truncate text-center text-xs px-2 py-2 rounded-md transition bg-purple-600 hover:bg-purple-700 text-white sm:flex-none sm:text-sm sm:px-4 sm:py-2"
-          >
-            Finance Officer View
-          </button>
+          {(
+            user?.roles?.includes("ADMIN") ||
+            user?.roles?.includes("FINANCE_MANAGER")
+          ) && (
+            <button
+              onClick={() => navigate("/members/finance-officer")}
+              className="flex-1 basis-1/3 min-w-0 truncate text-center text-xs px-2 py-2 rounded-md transition bg-purple-600 hover:bg-purple-700 text-white sm:flex-none sm:text-sm sm:px-4 sm:py-2"
+            >
+              Finance Officer View
+            </button>
+          )}
+
         </div>
 
         {/* Right: Add button (same line on desktop, full width below on mobile) */}

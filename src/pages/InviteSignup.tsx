@@ -15,6 +15,7 @@ type SignupForm = {
   firstName: string;
   lastName: string;
   phone?: string;
+  email?: string;
   username?: string;
   password: string;
 };
@@ -171,12 +172,20 @@ const InviteSignup: React.FC = () => {
         </label>
 
         <label className="grid gap-1">
-          <span className="text-sm">Phone (optional)</span>
+          <span className="text-sm">Phone </span>
           <input
             className="border rounded-xl px-3 py-2"
             name="phone"
             value={form.phone ?? ""}
             onChange={onChange}
+          />
+        </label>
+        <label className="grid gap-1 mb-4">
+          <span className="text-sm text-gray-600">Email</span>
+          <input
+            value={invitedEmail}
+            disabled
+            className="border rounded-xl px-3 py-2 bg-gray-100"
           />
         </label>
 

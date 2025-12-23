@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 export interface Teacher {
   id: number;
@@ -13,7 +13,9 @@ interface TeachersListProps {
   apiEndpoint?: string;
 }
 
-const TeachersList: React.FC<TeachersListProps> = ({ apiEndpoint = '/api/education/teachers' }) => {
+const TeachersList: React.FC<TeachersListProps> = ({
+  apiEndpoint = "/api/education/teachers",
+}) => {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,13 +28,13 @@ const TeachersList: React.FC<TeachersListProps> = ({ apiEndpoint = '/api/educati
       if (Array.isArray(resp.data)) {
         setTeachers(resp.data);
       } else {
-        console.error('Expected array but got', resp.data);
+        console.error("Expected array but got", resp.data);
         setTeachers([]);
       }
       setError(null);
     } catch (err) {
-      console.error('Failed to fetch teachers', err);
-      setError('Failed to load teachers.');
+      console.error("Failed to fetch teachers", err);
+      setError("Failed to load teachers.");
     } finally {
       setLoading(false);
     }
@@ -43,13 +45,13 @@ const TeachersList: React.FC<TeachersListProps> = ({ apiEndpoint = '/api/educati
   }, [apiEndpoint]);
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm('Delete this teacher?')) return;
+    if (!window.confirm("Delete this teacher?")) return;
     try {
       await axios.delete(`${apiEndpoint}/${id}`);
       loadTeachers();
     } catch (err) {
-      console.error('Failed to delete teacher', err);
-      alert('Failed to delete teacher.');
+      console.error("Failed to delete teacher", err);
+      alert("Failed to delete teacher.");
     }
   };
 
@@ -57,49 +59,71 @@ const TeachersList: React.FC<TeachersListProps> = ({ apiEndpoint = '/api/educati
   if (error) return <p className="text-red-600">{error}</p>;
 
   return (
-    <div className="overflow-x-auto bg-white rounded shadow">
-      <table className="min-w-full divide-y">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="px-4 py-2 text-left">Name</th>
-            <th className="px-4 py-2 text-left">Email</th>
-            <th className="px-4 py-2 text-left">Phone</th>
-            <th className="px-4 py-2 text-left">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {teachers.map((t) => (
-            <tr key={t.id} className="hover:bg-gray-50">
-              <td className="px-4 py-2">{t.name}</td>
-              <td className="px-4 py-2">{t.email}</td>
-              <td className="px-4 py-2">{t.phone}</td>
-              <td className="px-4 py-2 space-x-2">
-                <button
-                  type="button"
-                  onClick={() => navigate(`/education/tigrigna-study/teachers/${t.id}`)}
-                  className="text-blue-600 hover:underline text-sm"
-                >
-                  View
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/education/tigrigna-study/teachers/${t.id}/edit`)}
-                  className="text-green-600 hover:underline text-sm"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(t.id)}
-                  className="text-red-600 hover:underline text-sm"
-                >
-                  Delete
-                </button>
-              </td>
+    <div className="space-y-4">
+      {/* Header with title + Add button */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold text-gray-800">Teachers List</h1>
+        <button
+          onClick={() => navigate("/education/tigrigna-study/teachers/add")}
+          className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg shadow hover:bg-indigo-700 focus:outline-none"
+        >
+          + Add New Teacher
+        </button>
+      </div>
+
+      {/* Teachers Table */}
+      <div className="overflow-x-auto bg-white rounded shadow">
+        <table className="min-w-full divide-y">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="px-4 py-2 text-left">Name</th>
+              <th className="px-4 py-2 text-left">Email</th>
+              <th className="px-4 py-2 text-left">Phone</th>
+              <th className="px-4 py-2 text-left">Subject</th>
+              <th className="px-4 py-2 text-left">Grade</th>
+              <th className="px-4 py-2 text-left">Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y">
+            {teachers.map((t) => (
+              <tr key={t.id} className="hover:bg-gray-50">
+                <td className="px-4 py-2">{t.name}</td>
+                <td className="px-4 py-2">{t.email}</td>
+                <td className="px-4 py-2">{t.phone}</td>
+                <td className="px-4 py-2">—</td>
+                <td className="px-4 py-2">—</td>
+                <td className="px-4 py-2 space-x-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(`/education/tigrigna-study/teachers/${t.id}`)
+                    }
+                    className="text-blue-600 hover:underline text-sm"
+                  >
+                    View
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(`/education/tigrigna-study/teachers/${t.id}/edit`)
+                    }
+                    className="text-green-600 hover:underline text-sm"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(t.id)}
+                    className="text-red-600 hover:underline text-sm"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

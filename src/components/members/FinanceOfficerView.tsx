@@ -198,12 +198,12 @@ export default function FinanceOfficerView() {
           paymentDate: todayStr,
           churchMember: { id: member.id },
         });
-        setStatus("Pledge recorded.");
+        setStatus("Medhane Alem payment recorded.");
         await fetchPayments(member.id);
         setExpandedMember(member.id);
       } catch (e) {
         console.error(e);
-        setStatus("Failed to record pledge.");
+        setStatus("Failed to record payment.");
       }
       return;
     }
@@ -249,7 +249,14 @@ export default function FinanceOfficerView() {
     }
   };
 
+  
   const handleDeletePayment = async (memberId: number, paymentId: number) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this payment record?\nThis action cannot be undone."
+    );
+
+    if (!confirmed) return;
+
     setStatus("");
     try {
       await api.delete(`/payments/${paymentId}/${memberId}`);
@@ -260,6 +267,7 @@ export default function FinanceOfficerView() {
       setStatus("Failed to delete payment.");
     }
   };
+
 
   const filtered = useMemo(
     () =>

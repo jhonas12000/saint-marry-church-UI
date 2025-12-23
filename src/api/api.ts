@@ -1,4 +1,4 @@
-// src/api/api.ts
+
 import axios from "axios";
 import { getToken, signOutAndRedirect } from "../auth/storage.tsx";
 

@@ -30,7 +30,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import CommitteeProfilePage from "./pages/CommitteeProfilePage";
 import Dashboard from "./pages/Dashboard";
-
+import TeachersList from "./pages/TeachersList";
 
 // 🔹 Use the new Layout with hamburger + drawer
 import AppLayout from "./layout/Layout";
@@ -50,14 +50,16 @@ function App() {
         path="/signup"
         element={isAuthenticated ? <Navigate to="/" replace /> : <SignupPage />}
       />
-      <Route
+      {/* <Route
         path="/invite"
         element={isAuthenticated ? <Navigate to="/" replace /> : <InviteSignup />}
-      />
-      <Route
+      /> */}
+      <Route path="/invite" element={<InviteSignup />} />
+      {/* <Route
         path="/invite/:token"
         element={isAuthenticated ? <Navigate to="/" replace /> : <InviteSignup />}
-      />
+      /> */}
+      <Route path="/invite/:token" element={<InviteSignup />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
@@ -180,6 +182,18 @@ function App() {
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/education/teachers"
+        element={
+          <ProtectedRoute>
+            <AppLayout title="Teachers List">
+              <TeachersList />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/education/bible-study"
         element={

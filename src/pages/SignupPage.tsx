@@ -141,7 +141,7 @@ const SignupPage: React.FC = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700">
-              Phone <span className="text-gray-400">(optional)</span>
+              Phone <span className="text-gray-400"></span>
             </label>
             <input
               name="phone"
